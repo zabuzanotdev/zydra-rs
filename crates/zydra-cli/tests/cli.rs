@@ -448,6 +448,90 @@ fn version_is_reported() {
     assert!(stdout(&output).contains("zydra"));
 }
 
+#[test]
+fn the_activity_log_can_be_exported_to_a_file() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = encrypted_archive(directory.path(), SECRET);
+    let words = wordlist(directory.path(), &["letmein", SECRET]);
+    let log = directory.path().join("activity.log");
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+        "--export-log",
+        &log.to_string_lossy(),
+        "--quiet",
+    ]);
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    let exported = std::fs::read_to_string(&log).unwrap();
+    assert!(exported.contains("vault.zip"), "exported: {exported}");
+    // Hasil akhirnya ikut tercatat, bukan hanya kejadian sebelum hasilnya keluar.
+    assert!(exported.contains("Password found"), "exported: {exported}");
+    assert!(
+        exported.contains(SECRET) || exported.contains("Password"),
+        "exported: {exported}"
+    );
+}
+
+#[test]
+fn the_exported_log_follows_the_active_language() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = encrypted_archive(directory.path(), SECRET);
+    let words = wordlist(directory.path(), &["letmein"]);
+    let log = directory.path().join("activity.log");
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+        "--export-log",
+        &log.to_string_lossy(),
+        "--lang",
+        "id",
+        "--quiet",
+    ]);
+
+    assert_eq!(exit_code(&output), 1, "stderr: {}", stderr(&output));
+    let exported = std::fs::read_to_string(&log).unwrap();
+    assert!(
+        exported.contains("Catatan aktivitas Zydra"),
+        "exported: {exported}"
+    );
+    assert!(
+        exported.contains("Password tidak ditemukan"),
+        "exported: {exported}"
+    );
+}
+
+#[test]
+fn exporting_to_an_unwritable_path_is_a_target_error() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = encrypted_archive(directory.path(), SECRET);
+    let words = wordlist(directory.path(), &[SECRET]);
+    let log = directory.path().join("nowhere").join("activity.log");
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+        "--export-log",
+        &log.to_string_lossy(),
+        "--quiet",
+    ]);
+
+    assert_eq!(exit_code(&output), 3, "stderr: {}", stderr(&output));
+    assert!(
+        stderr(&output).contains("could not be written"),
+        "stderr: {}",
+        stderr(&output)
+    );
+}
+
 /// Menjalankan binary dengan direktori sesi yang ditentukan.
 fn run_with_sessions(arguments: &[&str], session_dir: &std::path::Path) -> Output {
     Command::new(binary())

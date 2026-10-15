@@ -5663,6 +5663,7 @@ version = "0.1.0"
 dependencies = [
  "fluent-bundle",
  "sys-locale",
+ "tempfile",
  "unic-langid",
  "zydra-core",
 ]

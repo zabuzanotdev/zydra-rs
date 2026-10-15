@@ -22,6 +22,7 @@ mod failure;
 mod log;
 mod progress;
 
+pub mod export;
 pub mod format;
 
 use fluent_bundle::{FluentArgs, FluentBundle, FluentResource};

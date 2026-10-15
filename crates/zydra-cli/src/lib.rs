@@ -11,10 +11,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use zydra_core::attack::{AttackLimits, AttackPlan};
-use zydra_core::constants::SESSION_SAVE_INTERVAL_SECS;
+use zydra_core::constants::{DEFAULT_LOG_CAPACITY, SESSION_SAVE_INTERVAL_SECS};
 use zydra_core::engine::cancel::CancelToken;
 use zydra_core::engine::crack::{run, EngineConfig, EngineEvent};
-use zydra_core::log::{LogEntry, LogLevel};
+use zydra_core::log::{LogBuffer, LogEntry, LogLevel};
 use zydra_core::model::charset::CharsetSet;
 use zydra_core::model::failure::{Backend, CrackFailure};
 use zydra_core::model::target::CrackTarget;
@@ -183,20 +183,39 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
     };
 
     let sessions = SessionTracker::for_target(&target);
+    let mut activity = LogBuffer::new(DEFAULT_LOG_CAPACITY);
+    record(
+        &mut activity,
+        reporter,
+        LogEntry::now(LogLevel::Info, "log-target-selected")
+            .with_arg("name", target.display_name.clone()),
+    );
+    record(
+        &mut activity,
+        reporter,
+        LogEntry::now(LogLevel::Info, count_log_key(&plan))
+            .with_arg("count", prepared.total.to_string()),
+    );
     let mut start_position = 0;
 
     if args.resume {
         match sessions.lookup() {
             Some(Ok(SessionLookup::Found(state))) => {
                 start_position = state.position.min(prepared.total);
-                reporter.log(
-                    &LogEntry::now(LogLevel::Info, "log-session-resumed")
+                record(
+                    &mut activity,
+                    reporter,
+                    LogEntry::now(LogLevel::Info, "log-session-resumed")
                         .with_arg("position", format::count(start_position))
                         .with_arg("total", format::count(prepared.total)),
                 );
             }
             Some(Ok(SessionLookup::Absent)) => {
-                reporter.log(&LogEntry::now(LogLevel::Info, "log-session-absent"));
+                record(
+                    &mut activity,
+                    reporter,
+                    LogEntry::now(LogLevel::Info, "log-session-absent"),
+                );
             }
             // Berkasnya sudah berubah, jadi posisi lama tidak lagi berarti. Melanjutkan
             // akan melewati kandidat yang seharusnya dicoba, dan memulai diam-diam dari
@@ -215,8 +234,10 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
             // Sesi rusak atau tidak bisa dibaca. Serangan tetap berjalan dari awal, dan
             // sebabnya masuk ke catatan alih-alih menghentikan pekerjaan.
             Some(Err(error)) => {
-                reporter.log(
-                    &LogEntry::now(LogLevel::Warn, "error-unknown")
+                record(
+                    &mut activity,
+                    reporter,
+                    LogEntry::now(LogLevel::Warn, "error-unknown")
                         .with_arg("detail", error.to_string()),
                 );
             }
@@ -339,8 +360,13 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
     }
     let elapsed = started.elapsed();
 
-    match outcome {
+    let code = match outcome {
         Outcome::Found { password, detail } => {
+            record(
+                &mut activity,
+                reporter,
+                LogEntry::now(LogLevel::Success, "result-granted"),
+            );
             // Serangan selesai sepenuhnya, jadi tidak ada yang perlu dilanjutkan.
             sessions.clear();
             if reporter.is_json() {
@@ -360,6 +386,11 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
             EXIT_FOUND
         }
         Outcome::Exhausted => {
+            record(
+                &mut activity,
+                reporter,
+                LogEntry::now(LogLevel::Warn, "result-denied"),
+            );
             sessions.clear();
             if reporter.is_json() {
                 reporter.json_line(&[
@@ -398,7 +429,18 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
             reporter.failure(&failure);
             EXIT_TARGET
         }
+    };
+
+    // Ekspor dilakukan setelah hasilnya ditampilkan, supaya berkasnya memuat hasil
+    // akhirnya juga dan bukan hanya kejadian sebelum hasilnya keluar.
+    if let Some(path) = args.export_log.as_ref() {
+        if let Err(error) = zydra_i18n::export::write_log(&activity, messages, path) {
+            eprintln!("{}: {error}", messages.text("error-log-export"));
+            return EXIT_TARGET;
+        }
     }
+
+    code
 }
 
 /// Posisi absolut dari sebuah kemajuan.
@@ -409,6 +451,27 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
 /// serangan dilanjutkan lalu dihentikan lagi, dan kemajuannya hilang sedikit demi sedikit.
 fn absolute_position(start: u64, tried: u64, total: u64) -> u64 {
     start.saturating_add(tried).min(total)
+}
+
+/// Mencatat satu kejadian: ditampilkan ke layar dan disimpan untuk diekspor.
+///
+/// Keduanya dilakukan bersama supaya apa yang terlihat di layar dan apa yang tertulis di
+/// berkas ekspor tidak bisa berbeda.
+fn record(activity: &mut LogBuffer, reporter: &Reporter, entry: LogEntry) {
+    reporter.log(&entry);
+    activity.push(entry);
+}
+
+/// Kunci log untuk jumlah kandidat sebuah rencana.
+///
+/// Wordlist memuat sejumlah kandidat yang sudah ada; brute force dan mask menelusuri ruang
+/// kombinasi. Rencana dengan aturan mengikuti kata dasarnya.
+fn count_log_key(plan: &AttackPlan) -> &'static str {
+    match plan {
+        AttackPlan::Dictionary { .. } => "log-wordlist-loaded",
+        AttackPlan::BruteForce { .. } | AttackPlan::Mask { .. } => "log-brute-force-space",
+        AttackPlan::WithRules { base, .. } => count_log_key(base),
+    }
 }
 
 /// Hasil akhir satu kali jalan.
@@ -501,6 +564,7 @@ mod tests {
             json: false,
             quiet: false,
             resume: false,
+            export_log: None,
         }
     }
 

@@ -36,7 +36,7 @@ fn level_key(level: LogLevel) -> &'static str {
 ///
 /// UTC dipakai karena jam lokal akan membutuhkan basis data zona waktu, dan untuk catatan
 /// operasi waktu yang tidak ambigu justru lebih berguna.
-fn format_time(unix_seconds: i64) -> String {
+pub(crate) fn format_time(unix_seconds: i64) -> String {
     let seconds_of_day = unix_seconds.rem_euclid(86_400);
     let hours = seconds_of_day / 3_600;
     let minutes = (seconds_of_day % 3_600) / 60;

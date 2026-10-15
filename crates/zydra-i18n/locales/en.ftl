@@ -150,3 +150,8 @@ cli-value-mask = PATTERN
 cli-value-rules = LIST
 cli-value-threads = COUNT
 cli-value-lang = CODE
+# Log export
+log-export-header = Zydra activity log, exported at { $time } UTC
+cli-help-export-log = Write the activity log to a file when the run finishes
+cli-value-log = FILE
+error-log-export = The activity log could not be written

@@ -151,3 +151,8 @@ cli-value-mask = POLA
 cli-value-rules = DAFTAR
 cli-value-threads = JUMLAH
 cli-value-lang = KODE
+# Ekspor log
+log-export-header = Catatan aktivitas Zydra, diekspor pada { $time } UTC
+cli-help-export-log = Tulis catatan aktivitas ke berkas setelah serangan selesai
+cli-value-log = BERKAS
+error-log-export = Catatan aktivitas tidak bisa ditulis

@@ -60,10 +60,14 @@ pub struct Args {
     /// Continue a previous run.
     #[arg(long = "resume")]
     pub resume: bool,
+
+    /// Write the activity log to a file.
+    #[arg(long = "export-log", value_name = "FILE")]
+    pub export_log: Option<PathBuf>,
 }
 
 /// Pasangan nama argumen dan kunci bantuan yang dipakai.
-const HELP_KEYS: [(&str, &str); 12] = [
+const HELP_KEYS: [(&str, &str); 13] = [
     ("file", "cli-help-file"),
     ("wordlist", "cli-help-wordlist"),
     ("charset", "cli-help-charset"),
@@ -76,6 +80,7 @@ const HELP_KEYS: [(&str, &str); 12] = [
     ("json", "cli-help-json"),
     ("quiet", "cli-help-quiet"),
     ("resume", "cli-help-resume"),
+    ("export_log", "cli-help-export-log"),
 ];
 
 /// Pasangan nama argumen dan kunci nama nilai yang dipakai.
@@ -83,7 +88,7 @@ const HELP_KEYS: [(&str, &str); 12] = [
 /// Nama nilai muncul di bantuan, misalnya `<BERKAS>` pada `-f, --file <BERKAS>`, jadi ia
 /// termasuk teks yang dilihat pengguna dan harus ikut diterjemahkan. Panjang minimum dan
 /// maksimum memakai kunci yang sama karena keduanya menerima hal yang sama.
-const VALUE_NAME_KEYS: [(&str, &str); 9] = [
+const VALUE_NAME_KEYS: [(&str, &str); 10] = [
     ("file", "cli-value-file"),
     ("wordlist", "cli-value-wordlist"),
     ("charset", "cli-value-classes"),
@@ -93,6 +98,7 @@ const VALUE_NAME_KEYS: [(&str, &str); 9] = [
     ("rules", "cli-value-rules"),
     ("threads", "cli-value-threads"),
     ("lang", "cli-value-lang"),
+    ("export_log", "cli-value-log"),
 ];
 
 /// Membangun perintah clap dengan seluruh teks dari katalog terjemahan.

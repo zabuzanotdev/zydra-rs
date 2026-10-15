@@ -12,3 +12,6 @@ fluent-bundle = "0.16.0"
 sys-locale = "0.3.2"
 unic-langid = "0.9.6"
 zydra-core = { version = "0.1.0", path = "../zydra-core" }
+
+[dev-dependencies]
+tempfile.workspace = true
