@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod candidate;
 pub mod constants;
 pub mod error;
 pub mod model;
