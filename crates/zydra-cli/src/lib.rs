@@ -83,34 +83,56 @@ fn resolve_messages(args: &[String]) -> Result<Messages, String> {
 
 /// Menyusun rencana serangan dari argumen.
 fn build_plan(args: &Args, messages: &Messages) -> Result<AttackPlan, String> {
-    let Some(file) = args.file.as_ref() else {
+    if args.file.is_none() {
         return Err(messages.text("usage-missing-target"));
-    };
-    let _ = file;
+    }
 
-    let has_wordlist = args.wordlist.is_some();
-    let has_brute_force = args.charset.is_some();
-    match (has_wordlist, has_brute_force) {
-        (true, true) => Err(messages.text("usage-conflicting-methods")),
-        (false, false) => Err(messages.text("usage-missing-method")),
-        (true, false) => Ok(AttackPlan::Dictionary {
-            wordlist: args.wordlist.clone().expect("checked above"),
-        }),
-        (false, true) => {
-            let charset = parse_charset(args.charset.as_deref().expect("checked above"))
-                .map_err(|name| messages.text_args("usage-bad-charset", &[("name", &name)]))?;
-            let Some(min_length) = args.min_length else {
-                return Err(messages.text("usage-bad-length"));
-            };
-            let Some(max_length) = args.max_length else {
-                return Err(messages.text("usage-bad-length"));
-            };
-            Ok(AttackPlan::BruteForce {
-                charset,
-                min_length,
-                max_length,
-            })
+    let methods = [
+        args.wordlist.is_some(),
+        args.charset.is_some(),
+        args.mask.is_some(),
+    ];
+    let chosen = methods.iter().filter(|chosen| **chosen).count();
+    if chosen == 0 {
+        return Err(messages.text("usage-missing-method"));
+    }
+    if chosen > 1 {
+        return Err(messages.text("usage-conflicting-methods"));
+    }
+
+    let base = if let Some(wordlist) = args.wordlist.as_ref() {
+        AttackPlan::Dictionary {
+            wordlist: wordlist.clone(),
         }
+    } else if let Some(mask) = args.mask.as_ref() {
+        AttackPlan::Mask {
+            pattern: mask.clone(),
+        }
+    } else {
+        let charset = parse_charset(args.charset.as_deref().expect("checked above"))
+            .map_err(|name| messages.text_args("usage-bad-charset", &[("name", &name)]))?;
+        let Some(min_length) = args.min_length else {
+            return Err(messages.text("usage-bad-length"));
+        };
+        let Some(max_length) = args.max_length else {
+            return Err(messages.text("usage-bad-length"));
+        };
+        AttackPlan::BruteForce {
+            charset,
+            min_length,
+            max_length,
+        }
+    };
+
+    // Aturan membungkus metode yang dipilih, bukan menjadi metode tersendiri. Dengan
+    // begitu `--rules` bisa dipakai bersama wordlist maupun mask tanpa menambah cabang
+    // di mana pun.
+    match args.rules.as_deref() {
+        Some(rules) if !rules.trim().is_empty() => Ok(AttackPlan::WithRules {
+            base: Box::new(base),
+            rules: rules.to_string(),
+        }),
+        _ => Ok(base),
     }
 }
 
@@ -156,14 +178,15 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
         }
     };
 
-    let method_key = match plan {
-        AttackPlan::Dictionary { .. } => "cli-method-dictionary",
-        AttackPlan::BruteForce { .. } => "cli-method-brute-force",
+    let method_label = messages.text(method_key(&plan));
+    let method_value = match &plan {
+        AttackPlan::WithRules { rules, .. } => format!("{method_label} + {rules}"),
+        _ => method_label,
     };
 
     reporter.header(&[
         ("cli-target", target.display_name.clone()),
-        ("cli-method", messages.text(method_key)),
+        ("cli-method", method_value),
         ("cli-candidates", prepared.total.to_string()),
     ]);
 
@@ -299,6 +322,19 @@ enum Outcome {
     Unknown,
 }
 
+/// Kunci terjemahan untuk metode sebuah rencana.
+///
+/// Rencana dengan aturan memakai metode dasarnya, karena aturan adalah lapisan tambahan di
+/// atas metode, bukan metode tersendiri.
+fn method_key(plan: &AttackPlan) -> &'static str {
+    match plan {
+        AttackPlan::Dictionary { .. } => "cli-method-dictionary",
+        AttackPlan::BruteForce { .. } => "cli-method-brute-force",
+        AttackPlan::Mask { .. } => "cli-method-mask",
+        AttackPlan::WithRules { base, .. } => method_key(base),
+    }
+}
+
 /// Memetakan kegagalan ke kode keluar.
 ///
 /// Pemisahannya disengaja: masalah argumen adalah kesalahan pemakaian, sedangkan masalah
@@ -346,6 +382,23 @@ pub fn default_progress_interval() -> Duration {
 mod tests {
     use super::*;
 
+    /// Argumen kosong, untuk dipakai dengan sintaks pembaruan struktur.
+    fn args() -> Args {
+        Args {
+            file: None,
+            wordlist: None,
+            charset: None,
+            min_length: None,
+            max_length: None,
+            mask: None,
+            rules: None,
+            threads: 0,
+            lang: None,
+            json: false,
+            quiet: false,
+        }
+    }
+
     #[test]
     fn letters_is_accepted_as_the_old_name_for_both_cases() {
         assert_eq!(
@@ -375,6 +428,24 @@ mod tests {
             EXIT_USAGE
         );
         assert_eq!(exit_code_for(&CrackFailure::NoCharsetSelected), EXIT_USAGE);
+    }
+
+    #[test]
+    fn a_bad_mask_or_rule_is_a_usage_error() {
+        assert_eq!(
+            exit_code_for(&CrackFailure::InvalidMask {
+                pattern: "?".into(),
+                reason: "x".into()
+            }),
+            EXIT_USAGE
+        );
+        assert_eq!(
+            exit_code_for(&CrackFailure::InvalidRule {
+                rule: "nope".into(),
+                reason: "x".into()
+            }),
+            EXIT_USAGE
+        );
     }
 
     #[test]
@@ -448,15 +519,8 @@ mod tests {
     fn building_a_plan_without_a_target_is_rejected() {
         let messages = Messages::new(Locale::En);
         let args = Args {
-            file: None,
             wordlist: Some("w.txt".into()),
-            charset: None,
-            min_length: None,
-            max_length: None,
-            threads: 0,
-            lang: None,
-            json: false,
-            quiet: false,
+            ..args()
         };
         assert_eq!(
             build_plan(&args, &messages).unwrap_err(),
@@ -473,10 +537,22 @@ mod tests {
             charset: Some("digits".into()),
             min_length: Some(1),
             max_length: Some(2),
-            threads: 0,
-            lang: None,
-            json: false,
-            quiet: false,
+            ..args()
+        };
+        assert_eq!(
+            build_plan(&args, &messages).unwrap_err(),
+            "Choose either a wordlist or a brute force, not both."
+        );
+    }
+
+    #[test]
+    fn asking_for_a_mask_and_a_wordlist_at_once_is_rejected() {
+        let messages = Messages::new(Locale::En);
+        let args = Args {
+            file: Some("v.zip".into()),
+            wordlist: Some("w.txt".into()),
+            mask: Some("?d".into()),
+            ..args()
         };
         assert_eq!(
             build_plan(&args, &messages).unwrap_err(),
@@ -489,19 +565,72 @@ mod tests {
         let messages = Messages::new(Locale::En);
         let args = Args {
             file: Some("v.zip".into()),
-            wordlist: None,
             charset: Some("digits".into()),
             min_length: Some(1),
-            max_length: None,
-            threads: 0,
-            lang: None,
-            json: false,
-            quiet: false,
+            ..args()
         };
         assert_eq!(
             build_plan(&args, &messages).unwrap_err(),
             "Minimum and maximum must be numbers, and minimum must not exceed maximum."
         );
+    }
+
+    #[test]
+    fn a_mask_becomes_a_mask_plan_without_needing_lengths() {
+        let messages = Messages::new(Locale::En);
+        let args = Args {
+            file: Some("v.zip".into()),
+            mask: Some("?l?l?d".into()),
+            ..args()
+        };
+        match build_plan(&args, &messages).unwrap() {
+            AttackPlan::Mask { pattern } => assert_eq!(pattern, "?l?l?d"),
+            other => panic!("unexpected plan: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rules_wrap_whichever_method_was_chosen() {
+        let messages = Messages::new(Locale::En);
+        let args = Args {
+            file: Some("v.zip".into()),
+            wordlist: Some("w.txt".into()),
+            rules: Some("capitalize".into()),
+            ..args()
+        };
+        match build_plan(&args, &messages).unwrap() {
+            AttackPlan::WithRules { base, rules } => {
+                assert!(matches!(*base, AttackPlan::Dictionary { .. }));
+                assert_eq!(rules, "capitalize");
+            }
+            other => panic!("unexpected plan: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_empty_rules_argument_is_ignored() {
+        let messages = Messages::new(Locale::En);
+        let args = Args {
+            file: Some("v.zip".into()),
+            mask: Some("?d".into()),
+            rules: Some("   ".into()),
+            ..args()
+        };
+        assert!(matches!(
+            build_plan(&args, &messages).unwrap(),
+            AttackPlan::Mask { .. }
+        ));
+    }
+
+    #[test]
+    fn a_plan_with_rules_reports_the_method_of_its_base() {
+        let plan = AttackPlan::WithRules {
+            base: Box::new(AttackPlan::Mask {
+                pattern: "?d".into(),
+            }),
+            rules: "leet".into(),
+        };
+        assert_eq!(method_key(&plan), "cli-method-mask");
     }
 
     #[test]

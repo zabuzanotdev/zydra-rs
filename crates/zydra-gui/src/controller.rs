@@ -165,10 +165,7 @@ impl Controller {
             LogEntry::now(LogLevel::Info, "log-target-selected")
                 .with_arg("name", target.display_name.clone()),
         );
-        let count_key = match plan {
-            AttackPlan::Dictionary { .. } => "log-wordlist-loaded",
-            AttackPlan::BruteForce { .. } => "log-brute-force-space",
-        };
+        let count_key = count_log_key(&plan);
         self.log.push(
             LogEntry::now(LogLevel::Info, count_key).with_arg("count", prepared.total.to_string()),
         );
@@ -310,6 +307,19 @@ impl Controller {
     fn finish(&mut self, phase: Phase) {
         self.run = None;
         self.phase = phase;
+    }
+}
+
+/// Kunci log untuk jumlah kandidat sebuah rencana.
+///
+/// Wordlist memuat sejumlah kandidat yang sudah ada; brute force dan mask menelusuri ruang
+/// kombinasi. Rencana dengan aturan mengikuti kata dasarnya, karena aturan hanya
+/// melipatgandakan kandidat, bukan mengubah dari mana kandidat itu berasal.
+fn count_log_key(plan: &AttackPlan) -> &'static str {
+    match plan {
+        AttackPlan::Dictionary { .. } => "log-wordlist-loaded",
+        AttackPlan::BruteForce { .. } | AttackPlan::Mask { .. } => "log-brute-force-space",
+        AttackPlan::WithRules { base, .. } => count_log_key(base),
     }
 }
 

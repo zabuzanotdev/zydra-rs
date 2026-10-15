@@ -346,3 +346,101 @@ fn version_is_reported() {
     assert_eq!(exit_code(&output), 0);
     assert!(stdout(&output).contains("zydra"));
 }
+
+#[test]
+fn a_mask_search_finds_the_password() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = encrypted_archive(directory.path(), "z9");
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "--mask",
+        "?l?d",
+        "--threads",
+        "4",
+    ]);
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains("z9"), "output: {text}");
+    assert!(text.contains("mask"), "method should say mask: {text}");
+}
+
+#[test]
+fn a_mask_search_can_be_narrowed_with_rules() {
+    let directory = tempfile::tempdir().unwrap();
+    // Kata dasar huruf kecil semua, password sebenarnya berhuruf besar di awal.
+    let archive = encrypted_archive(directory.path(), "Z9");
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "--mask",
+        "?l?d",
+        "--rules",
+        "capitalize",
+        "--threads",
+        "4",
+    ]);
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("Z9"));
+}
+
+#[test]
+fn rules_are_applied_to_a_wordlist_too() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = encrypted_archive(directory.path(), "Secret7");
+    let words = wordlist(directory.path(), &["secret", "other"]);
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+        "--rules",
+        "capitalize+append-digits:9",
+    ]);
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("Secret7"));
+}
+
+#[test]
+fn an_invalid_mask_is_a_usage_error() {
+    let output = run(&["-f", "vault.zip", "--mask", "?z"]);
+    assert_eq!(exit_code(&output), 2);
+    assert!(
+        stderr(&output).contains("?z"),
+        "stderr: {}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn an_invalid_rule_is_a_usage_error() {
+    let output = run(&["-f", "vault.zip", "--mask", "?d", "--rules", "nope"]);
+    assert_eq!(exit_code(&output), 2);
+    assert!(
+        stderr(&output).contains("nope"),
+        "stderr: {}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn a_mask_cannot_be_combined_with_a_wordlist() {
+    let output = run(&["-f", "vault.zip", "-d", "words.txt", "--mask", "?d"]);
+    assert_eq!(exit_code(&output), 2);
+    assert!(stderr(&output).contains("not both"));
+}
+
+#[test]
+fn the_mask_help_explains_the_tokens() {
+    let output = run(&["--help"]);
+    let text = stdout(&output);
+    assert!(text.contains("--mask"), "output: {text}");
+    assert!(text.contains("?l"), "output: {text}");
+    assert!(text.contains("--rules"), "output: {text}");
+}

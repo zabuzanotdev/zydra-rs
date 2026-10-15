@@ -24,6 +24,24 @@ pub enum CoreError {
         name: String,
     },
 
+    /// Pola mask tidak bisa diurai.
+    #[error("invalid mask {pattern}: {reason}")]
+    MaskParse {
+        /// Pola yang dikirim pengguna.
+        pattern: String,
+        /// Penanda teknis sebabnya.
+        reason: String,
+    },
+
+    /// Aturan mangling tidak bisa diurai.
+    #[error("invalid rule {rule}: {reason}")]
+    RuleParse {
+        /// Aturan yang dikirim pengguna.
+        rule: String,
+        /// Penanda teknis sebabnya.
+        reason: String,
+    },
+
     /// Nilai konfigurasi tidak masuk akal.
     #[error("invalid configuration: {detail}")]
     ConfigInvalid {

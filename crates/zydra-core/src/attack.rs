@@ -7,12 +7,16 @@
 use std::path::{Path, PathBuf};
 
 use crate::candidate::bruteforce::BruteForceSource;
+use crate::candidate::mask::MaskSource;
+use crate::candidate::rules::RulesSource;
 use crate::candidate::wordlist::WordlistSource;
 use crate::candidate::CandidateSource;
 use crate::constants::{DEFAULT_MAX_BRUTE_LENGTH, DEFAULT_MAX_COMBINATIONS};
 use crate::error::CoreError;
 use crate::model::charset::CharsetSet;
 use crate::model::failure::CrackFailure;
+use crate::model::mask::MaskPattern;
+use crate::model::rules::RuleSet;
 
 /// Batas yang berlaku untuk sebuah serangan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +37,11 @@ impl Default for AttackLimits {
 }
 
 /// Apa yang akan dicoba.
+///
+/// Pola mask dan aturan mangling disimpan sebagai teks apa adanya, bukan sebagai hasil
+/// uraian. Dengan begitu rencana tetap menjadi gambaran jujur dari masukan pengguna, semua
+/// kesalahan penguraian muncul di satu tempat dengan sebab yang tepat, dan rencana bisa
+/// disimpan lalu dimuat kembali tanpa kehilangan apa pun.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AttackPlan {
     /// Coba setiap baris sebuah wordlist.
@@ -48,6 +57,18 @@ pub enum AttackPlan {
         min_length: u8,
         /// Panjang maksimum.
         max_length: u8,
+    },
+    /// Coba setiap kombinasi yang diizinkan sebuah pola mask.
+    Mask {
+        /// Pola mask, misalnya `?l?l?d?d`.
+        pattern: String,
+    },
+    /// Terapkan aturan mangling pada kandidat sebuah rencana lain.
+    WithRules {
+        /// Rencana dasar yang menghasilkan kata dasar.
+        base: Box<AttackPlan>,
+        /// Daftar nama aturan yang dipisah koma.
+        rules: String,
     },
 }
 
@@ -125,7 +146,69 @@ impl AttackPlan {
                     source: Box::new(source),
                 })
             }
+            AttackPlan::Mask { pattern } => {
+                let mask =
+                    MaskPattern::parse(pattern).map_err(|error| mask_failure(pattern, error))?;
+                let total = mask.total();
+                if total > limits.max_combinations {
+                    return Err(CrackFailure::TooManyCombinations {
+                        total,
+                        limit: limits.max_combinations,
+                    });
+                }
+                let source = MaskSource::new(&mask)?;
+                Ok(PreparedAttack {
+                    total,
+                    source: Box::new(source),
+                })
+            }
+            AttackPlan::WithRules { base, rules } => {
+                let rule_set = RuleSet::parse(rules).map_err(|error| rule_failure(rules, error))?;
+
+                // Rencana dasar disiapkan lebih dulu. Batasnya diperiksa dua kali dengan
+                // sengaja: sekali untuk dasar, sekali lagi untuk hasil perkaliannya, karena
+                // aturan bisa melipatgandakan jumlah kandidat sampai sepuluh kali.
+                let inner = base.prepare(limits)?;
+                let total = inner.total.saturating_mul(rule_set.outputs_per_word());
+                if total > limits.max_combinations {
+                    return Err(CrackFailure::TooManyCombinations {
+                        total,
+                        limit: limits.max_combinations,
+                    });
+                }
+                Ok(PreparedAttack {
+                    total,
+                    source: Box::new(RulesSource::new(inner.source, rule_set)),
+                })
+            }
         }
+    }
+}
+
+/// Menerjemahkan kegagalan penguraian mask menjadi sebab yang bisa ditampilkan.
+fn mask_failure(pattern: &str, error: CoreError) -> CrackFailure {
+    CrackFailure::InvalidMask {
+        pattern: pattern.to_string(),
+        reason: technical_reason(error),
+    }
+}
+
+/// Menerjemahkan kegagalan penguraian aturan menjadi sebab yang bisa ditampilkan.
+fn rule_failure(rules: &str, error: CoreError) -> CrackFailure {
+    CrackFailure::InvalidRule {
+        rule: rules.to_string(),
+        reason: technical_reason(error),
+    }
+}
+
+/// Mengambil penanda teknis dari sebuah kesalahan inti.
+///
+/// Penandanya bersifat teknis dan ditujukan untuk catatan; antarmuka menampilkan kalimat
+/// dari katalog terjemahan, bukan teks ini.
+fn technical_reason(error: CoreError) -> String {
+    match error {
+        CoreError::MaskParse { reason, .. } | CoreError::RuleParse { reason, .. } => reason,
+        other => other.to_string(),
     }
 }
 
@@ -279,5 +362,145 @@ mod tests {
         assert_eq!(prepared.source.next_candidate().as_deref(), Some("alpha"));
         assert_eq!(prepared.source.next_candidate().as_deref(), Some("bravo"));
         assert_eq!(prepared.source.next_candidate(), None);
+    }
+
+    #[test]
+    fn a_mask_plan_reports_the_product_of_its_positions() {
+        let plan = AttackPlan::Mask {
+            pattern: "?l?l?d?d".to_string(),
+        };
+        let prepared = plan.prepare(&AttackLimits::default()).unwrap();
+        assert_eq!(prepared.total, 26 * 26 * 10 * 10);
+        assert_eq!(prepared.source.total(), prepared.total);
+    }
+
+    #[test]
+    fn a_mask_plan_yields_the_expected_first_candidates() {
+        let plan = AttackPlan::Mask {
+            pattern: "a?d".to_string(),
+        };
+        let mut prepared = plan.prepare(&AttackLimits::default()).unwrap();
+        assert_eq!(prepared.total, 10);
+        assert_eq!(prepared.source.next_candidate().as_deref(), Some("a0"));
+        assert_eq!(prepared.source.next_candidate().as_deref(), Some("a1"));
+    }
+
+    #[test]
+    fn an_invalid_mask_is_rejected_and_reports_the_pattern() {
+        let plan = AttackPlan::Mask {
+            pattern: "?z".to_string(),
+        };
+        match plan.prepare(&AttackLimits::default()).unwrap_err() {
+            CrackFailure::InvalidMask { pattern, reason } => {
+                assert_eq!(pattern, "?z");
+                assert_eq!(reason, "unknown-token-z");
+            }
+            other => panic!("unexpected failure: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_mask_beyond_the_combination_limit_is_rejected() {
+        let plan = AttackPlan::Mask {
+            pattern: "?a?a?a?a?a?a".to_string(),
+        };
+        let limits = AttackLimits {
+            max_combinations: 1_000,
+            ..AttackLimits::default()
+        };
+        assert!(matches!(
+            plan.prepare(&limits).unwrap_err(),
+            CrackFailure::TooManyCombinations { limit: 1_000, .. }
+        ));
+    }
+
+    #[test]
+    fn rules_multiply_the_candidates_of_the_base_plan() {
+        let file = wordlist(b"alpha\nbravo\n");
+        let plan = AttackPlan::WithRules {
+            base: Box::new(plan_for(&file)),
+            rules: "none,capitalize".to_string(),
+        };
+        let prepared = plan.prepare(&AttackLimits::default()).unwrap();
+        assert_eq!(prepared.total, 2 * 2);
+    }
+
+    #[test]
+    fn a_rules_plan_yields_the_expected_candidates_in_order() {
+        let file = wordlist(b"alpha\nbravo\n");
+        let plan = AttackPlan::WithRules {
+            base: Box::new(plan_for(&file)),
+            rules: "none,capitalize".to_string(),
+        };
+        let mut prepared = plan.prepare(&AttackLimits::default()).unwrap();
+        let mut seen = Vec::new();
+        while let Some(candidate) = prepared.source.next_candidate() {
+            seen.push(candidate);
+        }
+        assert_eq!(seen, vec!["alpha", "Alpha", "bravo", "Bravo"]);
+    }
+
+    #[test]
+    fn an_invalid_rule_is_rejected_and_reports_the_rule() {
+        let file = wordlist(b"alpha\n");
+        let plan = AttackPlan::WithRules {
+            base: Box::new(plan_for(&file)),
+            rules: "nope".to_string(),
+        };
+        match plan.prepare(&AttackLimits::default()).unwrap_err() {
+            CrackFailure::InvalidRule { rule, reason } => {
+                assert_eq!(rule, "nope");
+                assert_eq!(reason, "unknown-rule");
+            }
+            other => panic!("unexpected failure: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_rules_plan_beyond_the_combination_limit_is_rejected() {
+        let file = wordlist(b"one\ntwo\n");
+        let plan = AttackPlan::WithRules {
+            base: Box::new(plan_for(&file)),
+            rules: "append-digits".to_string(),
+        };
+        let limits = AttackLimits {
+            max_combinations: 5,
+            ..AttackLimits::default()
+        };
+        // Dua kata dasar dikali sepuluh angka menjadi dua puluh kandidat.
+        assert!(matches!(
+            plan.prepare(&limits).unwrap_err(),
+            CrackFailure::TooManyCombinations {
+                total: 20,
+                limit: 5
+            }
+        ));
+    }
+
+    #[test]
+    fn a_failing_base_plan_fails_the_rules_plan_too() {
+        let plan = AttackPlan::WithRules {
+            base: Box::new(AttackPlan::Dictionary {
+                wordlist: PathBuf::from("no-such-wordlist-here.txt"),
+            }),
+            rules: "capitalize".to_string(),
+        };
+        assert!(matches!(
+            plan.prepare(&AttackLimits::default()).unwrap_err(),
+            CrackFailure::FileUnreadable { .. }
+        ));
+    }
+
+    #[test]
+    fn rules_can_wrap_a_mask_plan() {
+        let plan = AttackPlan::WithRules {
+            base: Box::new(AttackPlan::Mask {
+                pattern: "?d".to_string(),
+            }),
+            rules: "prepend-digits:0".to_string(),
+        };
+        let mut prepared = plan.prepare(&AttackLimits::default()).unwrap();
+        assert_eq!(prepared.total, 10);
+        assert_eq!(prepared.source.next_candidate().as_deref(), Some("00"));
     }
 }

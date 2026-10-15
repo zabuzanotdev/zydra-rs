@@ -33,6 +33,14 @@ pub struct Args {
     #[arg(short = 'x', long = "max-length", value_name = "N")]
     pub max_length: Option<u8>,
 
+    /// Mask pattern.
+    #[arg(long = "mask", value_name = "PATTERN")]
+    pub mask: Option<String>,
+
+    /// Mangling rules.
+    #[arg(long = "rules", value_name = "LIST")]
+    pub rules: Option<String>,
+
     /// Worker threads.
     #[arg(long = "threads", value_name = "N", default_value_t = 0)]
     pub threads: usize,
@@ -51,12 +59,14 @@ pub struct Args {
 }
 
 /// Pasangan nama argumen dan kunci bantuan yang dipakai.
-const HELP_KEYS: [(&str, &str); 9] = [
+const HELP_KEYS: [(&str, &str); 11] = [
     ("file", "cli-help-file"),
     ("wordlist", "cli-help-wordlist"),
     ("charset", "cli-help-charset"),
     ("min_length", "cli-help-min-length"),
     ("max_length", "cli-help-max-length"),
+    ("mask", "cli-help-mask"),
+    ("rules", "cli-help-rules"),
     ("threads", "cli-help-threads"),
     ("lang", "cli-help-lang"),
     ("json", "cli-help-json"),
