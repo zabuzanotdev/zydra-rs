@@ -7,9 +7,11 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod attack;
 pub mod candidate;
 pub mod constants;
 pub mod engine;
 pub mod error;
+pub mod log;
 pub mod model;
 pub mod tester;

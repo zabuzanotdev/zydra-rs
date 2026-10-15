@@ -21,9 +21,12 @@ pub const SESSION_SAVE_INTERVAL_SECS: u64 = 5;
 /// Jumlah maksimum entri log yang disimpan di memori.
 pub const DEFAULT_LOG_CAPACITY: usize = 5_000;
 
-/// Jumlah byte entri terenkripsi yang dibaca untuk memverifikasi kandidat ZIP.
-pub const DEFAULT_ZIP_VERIFY_BYTES: usize = 4_096;
-
+/// Batas jumlah byte entri ZIP yang dibaca saat memverifikasi kandidat.
+///
+/// Verifikasi ZIP harus membaca entri sampai habis karena ZipCrypto hanya menyediakan
+/// 1 dari 256 bit untuk validasi, sehingga password salah bisa lolos di header. Batas ini
+/// mencegah arsip dengan entri raksasa menghabiskan memori dan waktu.
+pub const DEFAULT_ZIP_MAX_ENTRY_BYTES: u64 = 64 * 1024 * 1024;
 /// Nilai `workers` yang berarti "ikuti jumlah CPU".
 pub const DEFAULT_WORKERS: usize = 0;
 

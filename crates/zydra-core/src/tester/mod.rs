@@ -1,7 +1,11 @@
 //! Kontrak untuk menguji satu kandidat password terhadap sebuah target.
 //!
 //! Mesin pemecah hanya mengenal trait di modul ini. Implementasi nyata untuk tiap format
-//! tinggal di modul `zip`, `rar`, `pdf`, dan `shadow` (rencana A2).
+//! tinggal di modul `zip`, `rar`, `pdf`, dan `shadow`.
+
+pub mod factory;
+pub mod shadow;
+pub mod zip;
 
 use crate::model::failure::CrackFailure;
 use crate::model::target::{CrackTarget, TargetKind};

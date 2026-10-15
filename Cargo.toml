@@ -5,7 +5,7 @@ members = ["crates/zydra-core"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.85"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/zabuzanotdev/zydra-rs"
 authors = ["zabuzanotdev"]
@@ -14,8 +14,10 @@ authors = ["zabuzanotdev"]
 bitflags = "2"
 crossbeam-channel = "0.5"
 num_cpus = "1"
+pwhash = "1"
 thiserror = "1"
 tempfile = "3"
+zip = { version = "9", features = ["aes-crypto"] }
 
 [profile.release]
 lto = "thin"
