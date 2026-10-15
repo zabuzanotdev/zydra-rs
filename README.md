@@ -40,7 +40,7 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | Dua bahasa (Inggris, Indonesia) | Berfungsi |
 | Resume serangan panjang | Berfungsi |
 | Ekspor log | Belum ada |
-| Rilis siap unduh | Belum ada |
+| Rilis siap unduh | [v0.1.0](https://github.com/zabuzanotdev/zydra-rs/releases/tag/v0.1.0) |
 
 Pengujian: **414 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
@@ -318,7 +318,7 @@ worse than one that admits the gap.
 | Two languages (English, Indonesian) | Works |
 | Resuming long attacks | Works |
 | Log export | Not started |
-| Downloadable releases | Not started |
+| Downloadable releases | [v0.1.0](https://github.com/zabuzanotdev/zydra-rs/releases/tag/v0.1.0) |
 
 Testing: **414 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
@@ -368,3 +368,22 @@ adding one `.ftl` file.
   [`LICENSE-MIT-Zydra.txt`](LICENSE-MIT-Zydra.txt); MIT is compatible with GPL-3.0.
 - Built binaries include **libunrar** from RARLAB, whose licence permits extraction but
   forbids building a RAR compressor. Details in [`NOTICE`](NOTICE).
+
+---
+
+## Unduh
+
+Paket siap pakai tersedia di halaman [Releases](https://github.com/zabuzanotdev/zydra-rs/releases).
+Setiap paket memuat kedua binary, `LICENSE`, `LICENSE-MIT-Zydra.txt`, `NOTICE`, dan
+`README.md`.
+
+| Sistem | Paket |
+|---|---|
+| Windows (x86_64) | `zydra-x86_64-pc-windows-msvc.zip` |
+| Linux (x86_64) | `zydra-x86_64-unknown-linux-gnu.tar.gz` |
+| macOS (Apple Silicon) | `zydra-aarch64-apple-darwin.tar.gz` |
+| macOS (Intel) | `zydra-x86_64-apple-darwin.tar.gz` |
+
+Binary-nya tidak menandatangani apa pun dan tidak memasang apa pun; cukup dijalankan.
+Di Linux, antarmuka grafis membutuhkan pustaka sistem untuk jendela (xkbcommon, wayland,
+dan pustaka X11). Antarmuka baris perintah tidak membutuhkan itu.
