@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/zydra-core"]
+members = ["crates/zydra-cli","crates/zydra-core", "crates/zydra-i18n"]
 
 [workspace.package]
 version = "0.1.0"

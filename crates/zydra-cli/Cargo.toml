@@ -1,0 +1,25 @@
+[package]
+name = "zydra-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+clap = { version = "4.6.7", features = ["derive"] }
+indicatif = "0.18.6"
+owo-colors = { version = "4.4.0", features = ["supports-colors"] }
+zydra-core = { version = "0.1.0", path = "../zydra-core" }
+zydra-i18n = { version = "0.1.0", path = "../zydra-i18n" }
+
+[dev-dependencies]
+tempfile.workspace = true
+zip.workspace = true
+
+# Nama binary sengaja dipisah dari nama paket supaya yang dipasang pengguna bernama
+# `zydra`, dan supaya tes integrasi bisa menemukannya lewat CARGO_BIN_EXE_zydra.
+[[bin]]
+name = "zydra"
+path = "src/main.rs"

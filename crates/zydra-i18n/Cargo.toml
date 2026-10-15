@@ -1,0 +1,14 @@
+[package]
+name = "zydra-i18n"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+fluent-bundle = "0.16.0"
+sys-locale = "0.3.2"
+unic-langid = "0.9.6"
+zydra-core = { version = "0.1.0", path = "../zydra-core" }
