@@ -38,11 +38,11 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | Antarmuka baris perintah | Berfungsi |
 | Antarmuka grafis (eframe/egui) | Berfungsi |
 | Dua bahasa (Inggris, Indonesia) | Berfungsi |
-| Resume serangan panjang | Belum ada |
+| Resume serangan panjang | Berfungsi |
 | Ekspor log | Belum ada |
 | Rilis siap unduh | Belum ada |
 
-Pengujian: **370 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
+Pengujian: **396 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
 ---
 
@@ -140,10 +140,32 @@ yang hanya ada di Unix.
 | `-b`, `--charset` | Kelas karakter untuk brute force |
 | `-m`, `--min-length` | Panjang minimum |
 | `-x`, `--max-length` | Panjang maksimum |
+| `--mask` | Pola mask |
+| `--rules` | Aturan mangling |
+| `--resume` | Lanjutkan serangan yang terputus |
 | `--threads` | Jumlah worker, `0` berarti satu per CPU |
 | `--lang` | Bahasa antarmuka: `en` atau `id` |
 | `--json` | Satu objek JSON per baris, untuk skrip |
 | `-q`, `--quiet` | Keluaran polos tanpa warna dan tanpa bilah progres |
+
+### Melanjutkan serangan yang terputus
+
+Serangan panjang menyimpan posisinya setiap lima detik, jadi menutup jendela atau menekan
+Ctrl+C tidak menghilangkan kemajuannya:
+
+```bash
+zydra -f vault.zip -b letters,digits -m 1 -x 8 --resume
+```
+
+Posisi hanya berlaku untuk berkas yang persis sama. Setiap sesi menyimpan sidik jari
+berkasnya — lokasi, ukuran, waktu perubahan, dan jenisnya. Kalau berkasnya sudah berubah,
+Zydra menolak melanjutkan dan mengatakannya, alih-alih melanjutkan dari posisi yang tidak
+lagi berarti atau diam-diam memulai dari awal.
+
+Sesi disimpan di direktori data milik sistem operasi: `%APPDATA%\Zydra\sessions` di
+Windows, `~/Library/Application Support/Zydra/sessions` di macOS, dan
+`~/.local/share/zydra/sessions` di Linux. `ZYDRA_SESSION_DIR` bisa menimpanya untuk
+pemasangan portabel.
 
 ### Kode keluar
 
@@ -294,11 +316,11 @@ worse than one that admits the gap.
 | Command-line interface | Works |
 | Graphical interface (eframe/egui) | Works |
 | Two languages (English, Indonesian) | Works |
-| Resuming long attacks | Not started |
+| Resuming long attacks | Works |
 | Log export | Not started |
 | Downloadable releases | Not started |
 
-Testing: **370 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
+Testing: **396 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
 ## Usage
 

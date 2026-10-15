@@ -20,7 +20,7 @@ Yang **sudah selesai dan terverifikasi**:
 |---|---|---|
 | Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 11 kali |
 | Plan A1 | `docs/superpowers/plans/2026-10-15-zydra-core-engine.md` | 9 tugas, selesai semua |
-| `zydra-core` | `crates/zydra-core/` | Selesai: keempat format, mask, dan aturan mangling |
+| `zydra-core` | `crates/zydra-core/` | Selesai: keempat format, mask, aturan, dan sesi |
 | `zydra-i18n` | `crates/zydra-i18n/` | Selesai, locale en + id |
 | `zydra-cli` | `crates/zydra-cli/` | Selesai, menggantikan `Zydra.py` untuk keempat format |
 | `zydra-gui` | `crates/zydra-gui/` | Selesai untuk tata letak Sidebar + Workspace yang responsif |
@@ -28,8 +28,9 @@ Yang **sudah selesai dan terverifikasi**:
 | Backend RAR | `src/tester/rar.rs` | Selesai, RAR4 dan RAR5, teruji end-to-end |
 | Backend PDF | `src/tester/pdf.rs` | Selesai, teruji end-to-end |
 | Backend shadow | `src/tester/shadow.rs` | Selesai, teruji |
+| Sesi dan resume | `src/session/store.rs` | Selesai di core dan di CLI |
 
-Total **370 tes** lintas workspace, fmt bersih, clippy bersih.
+Total **396 tes** lintas workspace, fmt bersih, clippy bersih.
 
 Isi `zydra-core` yang sudah ada:
 
@@ -68,14 +69,14 @@ crate `zydra-gui`, CI, README, `LICENSE`, `NOTICE`.
 
 `cargo test --workspace` menjalankan 191 tes:
 
-- 213 tes unit `zydra-core`
+- 232 tes unit `zydra-core`
 - 11 tes end-to-end `zydra-core` untuk keempat format: ZIP, PDF, RAR4, dan RAR5, masing-masing
   dengan kasus password ditemukan dan tidak ditemukan, plus brute force dan mask
 - 28 tes `zydra-i18n`
-- 34 tes unit `zydra-cli`
-- 26 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
-  `CARGO_BIN_EXE_zydra`: keempat format, mask, aturan mangling, kedua bahasa, `--json`,
-  `--quiet`, dan setiap kode keluar
+- 37 tes unit `zydra-cli`
+- 30 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
+  `CARGO_BIN_EXE_zydra`: keempat format, mask, aturan mangling, resume, kedua bahasa,
+  `--json`, `--quiet`, dan setiap kode keluar
 - 58 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
   boleh ditekan", dan pengendali yang menjalankan serangan sungguhan sampai selesai
 
@@ -329,14 +330,13 @@ Sudah selesai:
 
 Belum dikerjakan:
 
-- `session` (resume serangan panjang) dan `config` (pengaturan tersimpan).
-- Panel pengaturan lanjutan di GUI, termasuk masukan mask dan aturan. Katalog teksnya
-  belum ditulis; tambahkan bersamaan dengan panelnya supaya tidak menulis kata yang nanti
-  berubah.
+- Panel pengaturan lanjutan di GUI, termasuk masukan mask dan aturan, serta tombol
+  melanjutkan. Katalog teksnya belum ditulis; tambahkan bersamaan dengan panelnya supaya
+  tidak menulis kata yang nanti berubah.
 - Ekspor log.
 
-Keempat format sudah selesai di core dan di CLI. GUI belum bisa memakai mask dan aturan
-karena panelnya belum ada; mesinnya sudah siap dan tidak perlu diubah lagi.
+Keempat format, mask, aturan, dan resume sudah selesai di core dan di CLI. GUI belum bisa
+memakainya karena panelnya belum ada; mesinnya sudah siap dan tidak perlu diubah lagi.
 
 ### Batasan yang diketahui, dan sebabnya
 
