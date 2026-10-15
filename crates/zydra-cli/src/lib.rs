@@ -18,9 +18,8 @@ use zydra_core::log::{LogEntry, LogLevel};
 use zydra_core::model::charset::CharsetSet;
 use zydra_core::model::failure::{Backend, CrackFailure};
 use zydra_core::model::target::CrackTarget;
-use zydra_core::session::store::{
-    FileSessionStore, SessionLookup, SessionState, SessionStore, TargetFingerprint,
-};
+use zydra_core::session::store::SessionLookup;
+use zydra_core::session::SessionTracker;
 use zydra_core::tester::factory::DefaultTesterFactory;
 use zydra_core::tester::TesterFactory;
 use zydra_i18n::{format, Locale, Messages};
@@ -183,7 +182,7 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
         }
     };
 
-    let sessions = Sessions::open(&target);
+    let sessions = SessionTracker::for_target(&target);
     let mut start_position = 0;
 
     if args.resume {
@@ -374,50 +373,6 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
     }
 }
 
-/// Sesi tersimpan untuk satu berkas target.
-///
-/// Kalau direktori data pengguna tidak bisa ditentukan, seluruh kemampuan melanjutkan
-/// dimatikan dan serangan tetap berjalan. Kehilangan fitur ini tidak boleh membuat alatnya
-/// tidak bisa dipakai sama sekali.
-struct Sessions {
-    store: Option<FileSessionStore>,
-    fingerprint: Option<TargetFingerprint>,
-}
-
-impl Sessions {
-    fn open(target: &CrackTarget) -> Sessions {
-        Sessions {
-            store: session_store(),
-            fingerprint: TargetFingerprint::of(target).ok(),
-        }
-    }
-
-    fn lookup(&self) -> Option<Result<SessionLookup, zydra_core::error::CoreError>> {
-        let store = self.store.as_ref()?;
-        let fingerprint = self.fingerprint.as_ref()?;
-        Some(store.load(fingerprint))
-    }
-
-    /// Menyimpan posisi. Kegagalan menyimpan tidak pernah menghentikan serangan.
-    fn save(&self, plan: &AttackPlan, position: u64) {
-        let (Some(store), Some(fingerprint)) = (self.store.as_ref(), self.fingerprint.as_ref())
-        else {
-            return;
-        };
-        let state = SessionState::new(fingerprint.clone(), plan.clone(), position);
-        let _ = store.save(&state);
-    }
-
-    /// Menghapus sesi setelah serangan selesai sepenuhnya.
-    fn clear(&self) {
-        let (Some(store), Some(fingerprint)) = (self.store.as_ref(), self.fingerprint.as_ref())
-        else {
-            return;
-        };
-        let _ = store.clear(fingerprint);
-    }
-}
-
 /// Posisi absolut dari sebuah kemajuan.
 ///
 /// Mesin menghitung kandidat yang dicoba sejak ia dijalankan, bukan sejak awal ruang
@@ -426,20 +381,6 @@ impl Sessions {
 /// serangan dilanjutkan lalu dihentikan lagi, dan kemajuannya hilang sedikit demi sedikit.
 fn absolute_position(start: u64, tried: u64, total: u64) -> u64 {
     start.saturating_add(tried).min(total)
-}
-
-/// Memilih tempat penyimpanan sesi.
-///
-/// `ZYDRA_SESSION_DIR` menimpanya. Itu berguna untuk pemasangan portabel, untuk memisahkan
-/// pekerjaan satu sama lain, dan untuk pengujian, yang tidak mungkin menulis ke direktori
-/// data pengguna sungguhan.
-fn session_store() -> Option<FileSessionStore> {
-    if let Ok(directory) = std::env::var("ZYDRA_SESSION_DIR") {
-        if !directory.trim().is_empty() {
-            return Some(FileSessionStore::new(directory));
-        }
-    }
-    FileSessionStore::in_user_data_dir().ok()
 }
 
 /// Hasil akhir satu kali jalan.

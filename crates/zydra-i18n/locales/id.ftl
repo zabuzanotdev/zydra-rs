@@ -96,6 +96,7 @@ app-subtitle = INTI PEMULIHAN
 action-start = MULAI DEKRIPSI
 action-stop = HENTIKAN
 action-reset = MULAI ULANG
+action-resume = LANJUTKAN
 action-browse = Pilih
 action-copy = Salin password
 action-copied = Tersalin

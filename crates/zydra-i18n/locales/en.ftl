@@ -95,6 +95,7 @@ app-subtitle = RECOVERY CORE
 action-start = START DECRYPTION
 action-stop = STOP
 action-reset = NEW RUN
+action-resume = RESUME
 action-browse = Browse
 action-copy = Copy password
 action-copied = Copied

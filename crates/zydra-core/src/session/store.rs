@@ -127,6 +127,7 @@ pub trait SessionStore: Send + Sync {
 }
 
 /// Sesi disimpan sebagai satu berkas JSON per berkas target.
+#[derive(Debug, Clone)]
 pub struct FileSessionStore {
     directory: PathBuf,
 }

@@ -14,13 +14,15 @@ use std::time::{Duration, Instant};
 use crossbeam_channel::{Receiver, TryRecvError};
 
 use zydra_core::attack::{AttackLimits, AttackPlan};
-use zydra_core::constants::DEFAULT_LOG_CAPACITY;
+use zydra_core::constants::{DEFAULT_LOG_CAPACITY, SESSION_SAVE_INTERVAL_SECS};
 use zydra_core::engine::cancel::CancelToken;
 use zydra_core::engine::crack::{run, EngineConfig, EngineEvent};
 use zydra_core::log::{LogBuffer, LogEntry, LogLevel};
 use zydra_core::model::failure::CrackFailure;
 use zydra_core::model::progress::TryingData;
 use zydra_core::model::target::CrackTarget;
+use zydra_core::session::store::SessionLookup;
+use zydra_core::session::SessionTracker;
 use zydra_core::tester::factory::DefaultTesterFactory;
 use zydra_core::tester::TesterFactory;
 
@@ -71,6 +73,10 @@ struct Run {
     cancel: CancelToken,
     total: u64,
     started: Instant,
+    /// Jumlah kandidat yang sudah dilewati sebelum run ini dimulai.
+    start_position: u64,
+    /// Waktu penyimpanan posisi terakhir.
+    last_save: Instant,
 }
 
 /// Pengendali satu kali pemulihan.
@@ -80,6 +86,9 @@ pub struct Controller {
     log: LogBuffer,
     target: Option<CrackTarget>,
     plan: Option<AttackPlan>,
+    sessions: SessionTracker,
+    /// Pelacak sesi yang dipilih pemanggil, mengalahkan direktori data pengguna.
+    session_override: Option<SessionTracker>,
 }
 
 impl Default for Controller {
@@ -97,7 +106,17 @@ impl Controller {
             log: LogBuffer::new(log_capacity),
             target: None,
             plan: None,
+            sessions: SessionTracker::disabled(),
+            session_override: None,
         }
+    }
+
+    /// Memakai pelacak sesi tertentu alih-alih direktori data pengguna.
+    ///
+    /// Dipakai pengujian, yang tidak boleh menulis ke direktori data pengguna sungguhan,
+    /// dan oleh antarmuka yang ingin menentukan sendiri lokasi penyimpanannya.
+    pub fn use_session_tracker(&mut self, tracker: SessionTracker) {
+        self.session_override = Some(tracker);
     }
 
     /// Keadaan sekarang.
@@ -145,6 +164,7 @@ impl Controller {
         target: CrackTarget,
         limits: &AttackLimits,
         config: EngineConfig,
+        resume: bool,
     ) -> Result<(), CrackFailure> {
         if self.is_running() {
             return Ok(());
@@ -160,6 +180,49 @@ impl Controller {
                 return Err(failure);
             }
         };
+
+        // Posisi tersimpan diperiksa sebelum apa pun dijalankan. Berkas yang sudah berubah
+        // ditolak, karena melanjutkan dari posisi lama akan melewati kandidat yang
+        // seharusnya dicoba, dan memulai diam-diam dari awal akan membuat pengguna mengira
+        // serangannya dilanjutkan.
+        let mut source = prepared.source;
+        let mut start_position = 0;
+        self.sessions = match self.session_override.as_ref() {
+            Some(tracker) => tracker.clone(),
+            None => SessionTracker::for_target(&target),
+        };
+
+        if resume {
+            match self.sessions.lookup() {
+                Some(Ok(SessionLookup::Found(state))) => {
+                    start_position = state.position.min(prepared.total);
+                    source.skip(start_position);
+                    self.log.push(
+                        LogEntry::now(LogLevel::Info, "log-session-resumed")
+                            .with_arg("position", start_position.to_string())
+                            .with_arg("total", prepared.total.to_string()),
+                    );
+                }
+                Some(Ok(SessionLookup::Absent)) => {
+                    self.log.record(LogLevel::Info, "log-session-absent");
+                }
+                Some(Ok(SessionLookup::Mismatch)) => {
+                    let failure = CrackFailure::SessionFingerprintMismatch;
+                    self.log_failure(&failure);
+                    self.phase = Phase::Failed {
+                        failure: failure.clone(),
+                    };
+                    return Err(failure);
+                }
+                Some(Err(error)) => {
+                    self.log.push(
+                        LogEntry::now(LogLevel::Warn, "error-unknown")
+                            .with_arg("detail", error.to_string()),
+                    );
+                }
+                None => {}
+            }
+        }
 
         self.log.push(
             LogEntry::now(LogLevel::Info, "log-target-selected")
@@ -185,29 +248,29 @@ impl Controller {
             return Err(failure);
         }
 
-        let events = run(
-            prepared.source,
-            factory,
-            target.clone(),
-            config,
-            cancel.clone(),
-        );
+        let events = run(source, factory, target.clone(), config, cancel.clone());
 
         self.phase = Phase::Running {
             progress: TryingData {
-                tried: 0,
+                tried: start_position,
                 total: prepared.total,
                 speed_per_second: 0,
                 elapsed: Duration::ZERO,
                 eta: None,
             },
         };
+        let now = Instant::now();
         self.run = Some(Run {
             events,
             cancel,
             total: prepared.total,
-            started: Instant::now(),
+            started: now,
+            start_position,
+            last_save: now,
         });
+        // Posisi awal disimpan juga, supaya serangan yang dihentikan sangat awal tetap
+        // punya titik lanjut.
+        self.sessions.save(&plan, start_position);
         self.target = Some(target);
         self.plan = Some(plan);
         Ok(())
@@ -269,14 +332,18 @@ impl Controller {
             EngineEvent::Started { .. } => None,
             EngineEvent::Progress(data) => {
                 self.phase = Phase::Running { progress: data };
+                self.save_progress(data.tried);
                 None
             }
             EngineEvent::Found { password, detail } => {
                 self.log.record(LogLevel::Success, "result-granted");
+                // Serangan selesai sepenuhnya, jadi tidak ada yang perlu dilanjutkan.
+                self.sessions.clear();
                 Some(Phase::Done { password, detail })
             }
             EngineEvent::Exhausted => {
                 self.log.record(LogLevel::Warn, "result-denied");
+                self.sessions.clear();
                 Some(Phase::Failed {
                     failure: CrackFailure::PasswordNotFound,
                 })
@@ -289,6 +356,28 @@ impl Controller {
                 self.log_failure(&failure);
                 Some(Phase::Failed { failure })
             }
+        }
+    }
+
+    /// Menyimpan posisi secara berkala selama serangan berjalan.
+    ///
+    /// Mesin menghitung kandidat yang dicoba sejak ia dijalankan, bukan sejak awal ruang
+    /// pencarian, jadi titik awalnya harus ditambahkan. Tanpa itu posisi yang tersimpan
+    /// akan mundur setiap kali serangan dilanjutkan lalu dihentikan lagi.
+    fn save_progress(&mut self, tried: u64) {
+        let Some(run) = self.run.as_ref() else {
+            return;
+        };
+        if run.last_save.elapsed() < Duration::from_secs(SESSION_SAVE_INTERVAL_SECS) {
+            return;
+        }
+        let position = run.start_position.saturating_add(tried).min(run.total);
+
+        if let Some(plan) = self.plan.as_ref() {
+            self.sessions.save(plan, position);
+        }
+        if let Some(run) = self.run.as_mut() {
+            run.last_save = Instant::now();
         }
     }
 
@@ -308,6 +397,17 @@ impl Controller {
         self.run = None;
         self.phase = phase;
     }
+}
+
+/// Apakah ada sesi tersimpan yang bisa dilanjutkan untuk sebuah target.
+///
+/// Dipanggil saat target dipilih, bukan setiap bingkai: pemeriksaannya membaca sistem
+/// berkas, dan melakukannya terus-menerus akan membuat antarmuka tersendat tanpa manfaat.
+pub fn session_available(target: &CrackTarget) -> bool {
+    matches!(
+        SessionTracker::for_target(target).lookup(),
+        Some(Ok(SessionLookup::Found(_)))
+    )
 }
 
 /// Kunci log untuk jumlah kandidat sebuah rencana.
@@ -417,6 +517,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         assert!(controller.is_running());
@@ -443,6 +544,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         run_to_completion(&mut controller);
@@ -471,6 +573,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         run_to_completion(&mut controller);
@@ -494,6 +597,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         controller.stop();
@@ -514,6 +618,7 @@ mod tests {
             CrackTarget::from_path(&missing),
             &AttackLimits::default(),
             fast_config(),
+            false,
         );
 
         assert!(matches!(result, Err(CrackFailure::FileUnreadable { .. })));
@@ -533,6 +638,7 @@ mod tests {
             CrackTarget::from_path(&archive),
             &AttackLimits::default(),
             fast_config(),
+            false,
         );
 
         assert_eq!(result.unwrap_err(), CrackFailure::EmptyWordlist);
@@ -555,6 +661,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         let before = controller.total();
@@ -564,6 +671,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         assert_eq!(controller.total(), before);
@@ -592,6 +700,7 @@ mod tests {
                 CrackTarget::from_path(&archive),
                 &AttackLimits::default(),
                 fast_config(),
+                false,
             )
             .unwrap();
         run_to_completion(&mut controller);
@@ -613,5 +722,159 @@ mod tests {
         for failure in &failures {
             assert!(!failure_code(failure).is_empty());
         }
+    }
+
+    /// Membuat pelacak sesi yang menulis ke direktori sementara milik tes.
+    ///
+    /// Pengujian tidak boleh menulis ke direktori data pengguna sungguhan, dan mengubah
+    /// variabel lingkungan tidak bisa dipakai di sini karena tes berjalan bersamaan di
+    /// dalam satu proses.
+    fn tracker_in(directory: &std::path::Path, target: &CrackTarget) -> SessionTracker {
+        SessionTracker::with_store(
+            zydra_core::session::store::FileSessionStore::new(directory.join("sessions")),
+            target,
+        )
+    }
+
+    fn wordlist_plan(words: &std::path::Path) -> AttackPlan {
+        AttackPlan::Dictionary {
+            wordlist: words.to_path_buf(),
+        }
+    }
+
+    #[test]
+    fn a_resumed_run_starts_from_the_saved_position() {
+        let directory = tempfile::tempdir().unwrap();
+        let archive = encrypted_archive(directory.path(), SECRET);
+        let words = wordlist(directory.path(), &["password", "letmein", SECRET]);
+        let target = CrackTarget::from_path(&archive);
+
+        let tracker = tracker_in(directory.path(), &target);
+        tracker.save(&wordlist_plan(&words), 2);
+
+        let mut controller = Controller::default();
+        controller.use_session_tracker(tracker);
+        controller
+            .start(
+                wordlist_plan(&words),
+                target,
+                &AttackLimits::default(),
+                fast_config(),
+                true,
+            )
+            .unwrap();
+
+        // Kemajuan pertama harus dimulai dari posisi tersimpan, bukan dari nol.
+        match controller.phase() {
+            Phase::Running { progress } => assert_eq!(progress.tried, 2),
+            other => panic!("unexpected phase: {other:?}"),
+        }
+        assert!(
+            controller
+                .log()
+                .entries()
+                .any(|entry| entry.key == "log-session-resumed"),
+            "the resume was not logged"
+        );
+
+        run_to_completion(&mut controller);
+        match controller.phase() {
+            Phase::Done { password, .. } => assert_eq!(password, SECRET),
+            other => panic!("unexpected phase: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resuming_a_changed_file_is_refused() {
+        let directory = tempfile::tempdir().unwrap();
+        let archive = encrypted_archive(directory.path(), SECRET);
+        let words = wordlist(directory.path(), &["password"]);
+        let target = CrackTarget::from_path(&archive);
+
+        let tracker = tracker_in(directory.path(), &target);
+        tracker.save(&wordlist_plan(&words), 1);
+
+        // Berkas targetnya berubah setelah sesi disimpan.
+        std::fs::write(&archive, b"the file is no longer the same archive").unwrap();
+
+        let mut controller = Controller::default();
+        controller.use_session_tracker(tracker);
+        let result = controller.start(
+            wordlist_plan(&words),
+            CrackTarget::from_path(&archive),
+            &AttackLimits::default(),
+            fast_config(),
+            true,
+        );
+
+        assert_eq!(
+            result.unwrap_err(),
+            CrackFailure::SessionFingerprintMismatch
+        );
+        assert!(!controller.is_running());
+    }
+
+    #[test]
+    fn resuming_without_a_saved_session_starts_from_the_beginning() {
+        let directory = tempfile::tempdir().unwrap();
+        let archive = encrypted_archive(directory.path(), "42");
+        let target = CrackTarget::from_path(&archive);
+
+        let mut controller = Controller::default();
+        controller.use_session_tracker(tracker_in(directory.path(), &target));
+        controller
+            .start(
+                AttackPlan::BruteForce {
+                    charset: CharsetSet::DIGITS,
+                    min_length: 1,
+                    max_length: 2,
+                },
+                target,
+                &AttackLimits::default(),
+                fast_config(),
+                true,
+            )
+            .unwrap();
+
+        match controller.phase() {
+            Phase::Running { progress } => assert_eq!(progress.tried, 0),
+            other => panic!("unexpected phase: {other:?}"),
+        }
+        assert!(
+            controller
+                .log()
+                .entries()
+                .any(|entry| entry.key == "log-session-absent"),
+            "the missing session was not logged"
+        );
+
+        run_to_completion(&mut controller);
+    }
+
+    #[test]
+    fn a_finished_run_leaves_nothing_to_resume() {
+        let directory = tempfile::tempdir().unwrap();
+        let archive = encrypted_archive(directory.path(), "42");
+        let target = CrackTarget::from_path(&archive);
+        let tracker = tracker_in(directory.path(), &target);
+
+        let mut controller = Controller::default();
+        controller.use_session_tracker(tracker.clone());
+        controller
+            .start(
+                AttackPlan::BruteForce {
+                    charset: CharsetSet::DIGITS,
+                    min_length: 1,
+                    max_length: 2,
+                },
+                target,
+                &AttackLimits::default(),
+                fast_config(),
+                false,
+            )
+            .unwrap();
+        run_to_completion(&mut controller);
+
+        assert_eq!(tracker.lookup().unwrap().unwrap(), SessionLookup::Absent);
     }
 }

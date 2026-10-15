@@ -35,6 +35,10 @@ pub struct ZydraApp {
     settings: UiSettings,
     /// Kunci terjemahan untuk masalah terakhir, ditampilkan sampai ada aksi berikutnya.
     notice: Option<String>,
+    /// Apakah ada sesi tersimpan untuk target yang sedang dipilih.
+    resume_available: bool,
+    /// Keadaan berjalan pada bingkai sebelumnya, untuk mengetahui kapan serangan berakhir.
+    was_running: bool,
 }
 
 impl ZydraApp {
@@ -53,6 +57,8 @@ impl ZydraApp {
             controller: Controller::default(),
             settings,
             notice: None,
+            resume_available: false,
+            was_running: false,
         };
         app.settings.sidebar_open = true;
         app
@@ -107,6 +113,20 @@ impl ZydraApp {
         });
     }
 
+    /// Menyegarkan pengetahuan tentang ada atau tidaknya sesi tersimpan.
+    ///
+    /// Dipanggil saat target berubah dan saat serangan berakhir, bukan setiap bingkai:
+    /// pemeriksaannya membaca sistem berkas, dan melakukannya terus-menerus akan membuat
+    /// antarmuka tersendat tanpa manfaat.
+    fn refresh_resume(&mut self) {
+        self.resume_available = self
+            .settings
+            .target
+            .as_ref()
+            .map(crate::controller::session_available)
+            .unwrap_or(false);
+    }
+
     fn handle_sidebar_actions(
         &mut self,
         actions: sidebar::SidebarActions,
@@ -117,6 +137,7 @@ impl ZydraApp {
             if let Some(path) = pick_file() {
                 self.settings.target = Some(CrackTarget::from_path(path));
                 self.notice = None;
+                self.refresh_resume();
             }
         }
 
@@ -134,7 +155,11 @@ impl ZydraApp {
         }
 
         if actions.start {
-            self.start(ctx, layout);
+            self.start(ctx, layout, false);
+        }
+
+        if actions.resume {
+            self.start(ctx, layout, true);
         }
 
         if actions.stop {
@@ -144,10 +169,11 @@ impl ZydraApp {
         if actions.reset {
             self.controller.reset();
             self.notice = None;
+            self.refresh_resume();
         }
     }
 
-    fn start(&mut self, ctx: &Context, layout: LayoutMode) {
+    fn start(&mut self, ctx: &Context, layout: LayoutMode, resume: bool) {
         let Ok(plan) = self.settings.plan() else {
             return;
         };
@@ -159,7 +185,11 @@ impl ZydraApp {
 
         // Sebab kegagalan sudah disimpan pengendali dan akan ditampilkan area kerja dengan
         // kalimat yang tepat, jadi tidak ada pemberitahuan umum yang perlu ditambah.
-        if self.controller.start(plan, target, &limits, config).is_ok() {
+        if self
+            .controller
+            .start(plan, target, &limits, config, resume)
+            .is_ok()
+        {
             self.notice = None;
             if layout.sidebar_is_collapsible() {
                 // Setelah dimulai, panel pilihan tidak lagi berguna dan ruangnya lebih
@@ -178,6 +208,14 @@ impl App for ZydraApp {
         if self.controller.is_running() {
             ctx.request_repaint_after(RUNNING_REPAINT);
         }
+
+        // Serangan yang baru berakhir meninggalkan sesi tersimpan, jadi tombol melanjutkan
+        // perlu dievaluasi ulang tepat pada saat itu.
+        let running = self.controller.is_running();
+        if self.was_running && !running {
+            self.refresh_resume();
+        }
+        self.was_running = running;
 
         let layout = LayoutMode::from_width(ctx.screen_rect().width());
         let full_width = layout.buttons_are_full_width();
@@ -203,6 +241,7 @@ impl App for ZydraApp {
                         layout,
                         self.controller.is_running(),
                         self.controller.phase().is_finished(),
+                        self.resume_available,
                     );
                 });
         } else {
@@ -217,6 +256,7 @@ impl App for ZydraApp {
                         layout,
                         self.controller.is_running(),
                         self.controller.phase().is_finished(),
+                        self.resume_available,
                     );
                 }
             });

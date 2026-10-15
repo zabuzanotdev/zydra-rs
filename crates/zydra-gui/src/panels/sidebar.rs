@@ -23,6 +23,8 @@ pub struct SidebarActions {
     pub stop: bool,
     /// Tombol mulai ulang ditekan.
     pub reset: bool,
+    /// Tombol lanjutkan ditekan.
+    pub resume: bool,
     /// Tombol pilih berkas target ditekan.
     pub browse_target: bool,
     /// Tombol pilih wordlist ditekan.
@@ -39,6 +41,7 @@ const CHARSET_KEYS: [(CharsetSet, &str); 5] = [
 ];
 
 /// Menggambar panel pilihan.
+#[allow(clippy::too_many_arguments)]
 pub fn sidebar(
     ui: &mut Ui,
     theme: &Theme,
@@ -47,6 +50,7 @@ pub fn sidebar(
     layout: LayoutMode,
     running: bool,
     finished: bool,
+    resume_available: bool,
 ) -> SidebarActions {
     let mut actions = SidebarActions::default();
     let full_width = layout.buttons_are_full_width();
@@ -83,6 +87,7 @@ pub fn sidebar(
         &mut actions,
         running,
         finished,
+        resume_available,
         full_width,
     );
 
@@ -252,12 +257,26 @@ fn action_section(
     actions: &mut SidebarActions,
     running: bool,
     finished: bool,
+    resume_available: bool,
     full_width: bool,
 ) {
     if running {
         actions.stop =
             controls::secondary_button(ui, theme, &messages.text("action-stop"), true, full_width);
         return;
+    }
+
+    // Tombol melanjutkan hanya muncul kalau memang ada yang bisa dilanjutkan. Menampilkannya
+    // selalu akan membuat pengguna menebak-nebak apakah serangannya tersimpan.
+    if resume_available {
+        actions.resume = controls::secondary_button(
+            ui,
+            theme,
+            &messages.text("action-resume"),
+            true,
+            full_width,
+        );
+        ui.add_space(theme.gap(1.5));
     }
 
     actions.start = controls::primary_button(
