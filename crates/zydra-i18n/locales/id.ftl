@@ -141,3 +141,13 @@ workspace-progress = Kemajuan
 workspace-activity = Aktivitas
 log-panel-empty = Belum ada aktivitas
 stat-elapsed = durasi
+
+# Nama nilai yang muncul di bantuan, misalnya <FILE> pada "-f, --file <FILE>"
+cli-value-file = BERKAS
+cli-value-wordlist = WORDLIST
+cli-value-classes = KELAS
+cli-value-length = PANJANG
+cli-value-mask = POLA
+cli-value-rules = DAFTAR
+cli-value-threads = JUMLAH
+cli-value-lang = KODE

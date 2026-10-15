@@ -78,6 +78,23 @@ const HELP_KEYS: [(&str, &str); 12] = [
     ("resume", "cli-help-resume"),
 ];
 
+/// Pasangan nama argumen dan kunci nama nilai yang dipakai.
+///
+/// Nama nilai muncul di bantuan, misalnya `<BERKAS>` pada `-f, --file <BERKAS>`, jadi ia
+/// termasuk teks yang dilihat pengguna dan harus ikut diterjemahkan. Panjang minimum dan
+/// maksimum memakai kunci yang sama karena keduanya menerima hal yang sama.
+const VALUE_NAME_KEYS: [(&str, &str); 9] = [
+    ("file", "cli-value-file"),
+    ("wordlist", "cli-value-wordlist"),
+    ("charset", "cli-value-classes"),
+    ("min_length", "cli-value-length"),
+    ("max_length", "cli-value-length"),
+    ("mask", "cli-value-mask"),
+    ("rules", "cli-value-rules"),
+    ("threads", "cli-value-threads"),
+    ("lang", "cli-value-lang"),
+];
+
 /// Membangun perintah clap dengan seluruh teks dari katalog terjemahan.
 ///
 /// Tata letak bantuan ditulis sendiri karena clap membawa kata bawaannya sendiri
@@ -94,6 +111,9 @@ pub fn command(messages: &Messages) -> Command {
         .help_template(template);
     for (id, key) in HELP_KEYS {
         command = command.mut_arg(id, |arg| arg.help(messages.text(key)));
+    }
+    for (id, key) in VALUE_NAME_KEYS {
+        command = command.mut_arg(id, |arg| arg.value_name(messages.text(key)));
     }
     // Arg bantuan dan versi bawaan clap baru ada setelah perintah dibangun, jadi
     // deskripsinya baru bisa diganti di titik ini. `build` bekerja di tempat dan tidak
@@ -220,6 +240,53 @@ mod tests {
         assert!(!indonesian.contains("Usage:"), "{indonesian}");
         assert!(!indonesian.contains("Options:"), "{indonesian}");
         assert!(!indonesian.contains("Print help"), "{indonesian}");
+    }
+
+    #[test]
+    fn the_value_placeholders_are_translated_too() {
+        // Nama nilai muncul di bantuan sebagai `<FILE>`, jadi ia sama terlihatnya dengan
+        // kalimat bantuan dan harus ikut diterjemahkan.
+        let english = command(&Messages::new(Locale::En))
+            .render_help()
+            .to_string();
+        let indonesian = command(&Messages::new(Locale::Id))
+            .render_help()
+            .to_string();
+
+        for (id, key) in VALUE_NAME_KEYS {
+            let _ = id;
+            let english_name = Messages::new(Locale::En).text(key);
+            let indonesian_name = Messages::new(Locale::Id).text(key);
+            assert!(
+                english.contains(&format!("<{english_name}>")),
+                "English help is missing <{english_name}>"
+            );
+            assert!(
+                indonesian.contains(&format!("<{indonesian_name}>")),
+                "Indonesian help is missing <{indonesian_name}>"
+            );
+        }
+    }
+
+    #[test]
+    fn no_english_placeholder_survives_in_the_indonesian_help() {
+        let indonesian = command(&Messages::new(Locale::Id))
+            .render_help()
+            .to_string();
+        for english_only in [
+            "<FILE>",
+            "<CLASSES>",
+            "<LENGTH>",
+            "<PATTERN>",
+            "<LIST>",
+            "<COUNT>",
+            "<CODE>",
+        ] {
+            assert!(
+                !indonesian.contains(english_only),
+                "{english_only} leaked into the Indonesian help"
+            );
+        }
     }
 
     #[test]
