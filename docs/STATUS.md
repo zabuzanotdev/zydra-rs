@@ -312,10 +312,8 @@ bahasa dari dalam jendela.
 Yang belum ada di GUI:
 
 - Panel pengaturan lanjutan (jumlah worker, batas kombinasi, byte verifikasi ZIP).
-- Font Inter dan JetBrains Mono. Sekarang memakai font bawaan egui. Tampilan tetap
-  berjalan, dan menambahkannya hanya perlu memuat berkas font di `fonts.rs`.
 - Panel untuk memilih dan memuat sesi yang tersimpan (menunggu `session` di Plan C).
-- Ekspor log dari antarmuka (menunggu `log` ekspor di Plan C).
+- Ekspor log dari antarmuka (menunggu ekspor log di Plan C).
 
 **Plan C — fitur lanjutan + rilis.** `session` (resume), `config`, mask, rules, panel
 settings, ekspor log, CI 3 OS, dan rilis otomatis saat tag.

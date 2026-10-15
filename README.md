@@ -153,6 +153,9 @@ tombol berubah jadi lebar penuh. Semua keputusan itu ada di satu berkas,
 
 Bahasa antarmuka bisa diganti dari jendela tanpa memulai ulang aplikasi.
 
+Font Inter dan JetBrains Mono dibundel di dalam binary, jadi tidak ada yang perlu
+dipasang dan tampilannya tidak bergantung pada font sistem.
+
 ---
 
 ## Arsitektur

@@ -64,10 +64,14 @@ Komponen pihak ketiga
 
 2. Font
    -------
-   Antarmuka grafis belum dibangun. Saat dibangun, ia akan membundel font Inter dan
-   JetBrains Mono, yang keduanya dirilis di bawah SIL Open Font License 1.1 dan
-   kompatibel dengan GPL-3.0. Berkas lisensinya akan disertakan di direktori font
-   masing-masing. Bagian ini dicatat sekarang supaya kewajibannya tidak terlewat.
+   Antarmuka grafis membundel dua font:
+
+     Inter               https://github.com/rsms/inter
+     JetBrains Mono      https://github.com/JetBrains/JetBrainsMono
+
+   Keduanya dirilis di bawah SIL Open Font License 1.1, yang kompatibel dengan
+   GPL-3.0. Teks lisensi lengkapnya disertakan bersama berkas fontnya di
+   crates/zydra-gui/assets/fonts/OFL-Inter.txt dan OFL-JetBrainsMono.txt.
 
 3. Crate Rust lainnya
    ---------------------
