@@ -60,6 +60,7 @@ error-invalid-mask = Invalid mask pattern: { $pattern }
 error-invalid-rule = Unknown rule: { $rule }
 error-too-many-combinations = Too many combinations: { $total }, limit { $limit }.
 error-no-candidate = Nothing to try.
+error-not-encrypted = This file is not encrypted, so there is no password to recover.
 error-backend-unavailable = The { $backend } backend is not available in this build.
 error-session-mismatch = The saved session does not match this file.
 error-unknown = The operation failed.

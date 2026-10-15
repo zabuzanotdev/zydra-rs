@@ -390,6 +390,58 @@ fn a_pdf_archive_is_cracked_from_the_command_line() {
 }
 
 #[test]
+fn an_unencrypted_archive_is_reported_as_a_target_error() {
+    let directory = tempfile::tempdir().unwrap();
+    let archive = directory.path().join("plain.zip");
+    let file = std::fs::File::create(&archive).unwrap();
+    let mut writer = zip::ZipWriter::new(file);
+    writer
+        .start_file("plain.txt", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    writer.write_all(b"no password here").unwrap();
+    writer.finish().unwrap();
+    let words = wordlist(directory.path(), &["password"]);
+
+    let output = run(&[
+        "-f",
+        &archive.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+    ]);
+
+    // Tanpa pemeriksaan ini, arsip tanpa enkripsi terbuka dengan password apa pun dan
+    // kandidat pertama dilaporkan sebagai password yang ditemukan.
+    assert_eq!(exit_code(&output), 3, "stderr: {}", stderr(&output));
+    assert!(
+        stderr(&output).contains("not encrypted"),
+        "stderr: {}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn an_unencrypted_rar_archive_is_reported_as_a_target_error() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("zydra-core")
+        .join("tests")
+        .join("fixtures")
+        .join("rar4_plain.rar");
+    let directory = tempfile::tempdir().unwrap();
+    let words = wordlist(directory.path(), &["password"]);
+
+    let output = run(&[
+        "-f",
+        &fixture.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+    ]);
+
+    assert_eq!(exit_code(&output), 3, "stderr: {}", stderr(&output));
+    assert!(stderr(&output).contains("not encrypted"));
+}
+
+#[test]
 fn version_is_reported() {
     let output = run(&["--version"]);
     assert_eq!(exit_code(&output), 0);

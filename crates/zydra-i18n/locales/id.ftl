@@ -61,6 +61,7 @@ error-invalid-mask = Pola mask tidak sah: { $pattern }
 error-invalid-rule = Aturan tidak dikenal: { $rule }
 error-too-many-combinations = Terlalu banyak kombinasi: { $total }, batas { $limit }.
 error-no-candidate = Tidak ada yang bisa dicoba.
+error-not-encrypted = Berkas ini tidak terenkripsi, jadi tidak ada password yang perlu dipulihkan.
 error-backend-unavailable = Backend { $backend } tidak tersedia di build ini.
 error-session-mismatch = Sesi tersimpan tidak cocok dengan berkas ini.
 error-unknown = Operasi gagal.

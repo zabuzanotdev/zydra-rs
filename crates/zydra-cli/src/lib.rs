@@ -21,7 +21,7 @@ use zydra_core::model::target::CrackTarget;
 use zydra_core::session::store::SessionLookup;
 use zydra_core::session::SessionTracker;
 use zydra_core::tester::factory::DefaultTesterFactory;
-use zydra_core::tester::TesterFactory;
+use zydra_core::tester::{EncryptionKind, TesterFactory};
 use zydra_i18n::{format, Locale, Messages};
 
 use crate::cli::Args;
@@ -248,6 +248,34 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
         ..EngineConfig::default()
     };
 
+    // Membuka target sekali sebelum pekerjaan dimulai. Tanpa ini, berkas yang tidak
+    // terenkripsi dan backend yang bermasalah baru ketahuan setelah bilah progres sempat
+    // muncul, dan pengguna menunggu untuk sesuatu yang memang tidak akan berjalan.
+    match factory.create(&target) {
+        Ok(tester) if tester.info().encryption == EncryptionKind::None => {
+            let failure = CrackFailure::TargetNotEncrypted;
+            if reporter.is_json() {
+                reporter.json_line(&[
+                    ("kind", json::string("failed")),
+                    ("code", json::string(failure_code(&failure))),
+                ]);
+            }
+            reporter.failure(&failure);
+            return exit_code_for(&failure);
+        }
+        Ok(_) => {}
+        Err(failure) => {
+            if reporter.is_json() {
+                reporter.json_line(&[
+                    ("kind", json::string("failed")),
+                    ("code", json::string(failure_code(&failure))),
+                ]);
+            }
+            reporter.failure(&failure);
+            return exit_code_for(&failure);
+        }
+    }
+
     let started = Instant::now();
     let events = run(prepared.source, factory, target, config, cancel);
     let bar = reporter.progress_bar(total);
@@ -418,6 +446,7 @@ fn exit_code_for(failure: &CrackFailure) -> u8 {
         CrackFailure::FileUnreadable { .. }
         | CrackFailure::BackendUnavailable { .. }
         | CrackFailure::UnsupportedFormat { .. }
+        | CrackFailure::TargetNotEncrypted
         | CrackFailure::SessionFingerprintMismatch => EXIT_TARGET,
         CrackFailure::PasswordNotFound | CrackFailure::NoCandidate => EXIT_NOT_FOUND,
         _ => EXIT_USAGE,
@@ -437,6 +466,7 @@ fn failure_code(failure: &CrackFailure) -> &'static str {
         CrackFailure::InvalidRule { .. } => "invalid-rule",
         CrackFailure::TooManyCombinations { .. } => "too-many-combinations",
         CrackFailure::NoCandidate => "no-candidate",
+        CrackFailure::TargetNotEncrypted => "target-not-encrypted",
         CrackFailure::BackendUnavailable { backend, .. } => match backend {
             Backend::Zip => "backend-unavailable-zip",
             Backend::Rar => "backend-unavailable-rar",

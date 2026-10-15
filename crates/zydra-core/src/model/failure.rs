@@ -66,6 +66,12 @@ pub enum CrackFailure {
     },
     /// Tidak ada kandidat yang bisa dicoba.
     NoCandidate,
+    /// Berkas target ternyata tidak terenkripsi.
+    ///
+    /// Tanpa varian ini, membuka berkas tanpa enkripsi berhasil dengan password apa pun,
+    /// sehingga kandidat pertama dilaporkan sebagai password yang ditemukan. Itu jawaban
+    /// yang salah untuk pertanyaan yang tidak pernah ditanyakan.
+    TargetNotEncrypted,
     /// Backend untuk format ini tidak tersedia pada build ini.
     BackendUnavailable {
         /// Backend yang dimaksud.

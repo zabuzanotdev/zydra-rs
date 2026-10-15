@@ -24,7 +24,7 @@ use zydra_core::model::target::CrackTarget;
 use zydra_core::session::store::SessionLookup;
 use zydra_core::session::SessionTracker;
 use zydra_core::tester::factory::DefaultTesterFactory;
-use zydra_core::tester::TesterFactory;
+use zydra_core::tester::{EncryptionKind, TesterFactory};
 
 /// Keadaan satu kali jalan, seperti yang dibaca antarmuka.
 #[derive(Debug, Clone, PartialEq)]
@@ -240,12 +240,29 @@ impl Controller {
         // berkas yang hilang atau backend yang tidak tersedia baru ketahuan setelah
         // antarmuka sempat menampilkan progres, dan pengguna menunggu untuk sesuatu yang
         // memang tidak akan berjalan.
-        if let Err(failure) = factory.create(&target) {
-            self.log_failure(&failure);
-            self.phase = Phase::Failed {
-                failure: failure.clone(),
-            };
-            return Err(failure);
+        // Berkas tanpa enkripsi akan berhasil dibuka dengan password apa pun, sehingga
+        // kandidat pertama dilaporkan sebagai password yang ditemukan. Itu jawaban yang
+        // salah untuk pertanyaan yang tidak pernah ditanyakan.
+        //
+        // Pemeriksaan ini juga menangkap berkas yang hilang dan backend yang bermasalah
+        // sebelum antarmuka sempat menampilkan progres.
+        match factory.create(&target) {
+            Ok(tester) if tester.info().encryption == EncryptionKind::None => {
+                let failure = CrackFailure::TargetNotEncrypted;
+                self.log_failure(&failure);
+                self.phase = Phase::Failed {
+                    failure: failure.clone(),
+                };
+                return Err(failure);
+            }
+            Ok(_) => {}
+            Err(failure) => {
+                self.log_failure(&failure);
+                self.phase = Phase::Failed {
+                    failure: failure.clone(),
+                };
+                return Err(failure);
+            }
         }
 
         let events = run(source, factory, target.clone(), config, cancel.clone());
@@ -436,6 +453,7 @@ fn failure_code(failure: &CrackFailure) -> &'static str {
         CrackFailure::InvalidRule { .. } => "invalid-rule",
         CrackFailure::TooManyCombinations { .. } => "too-many-combinations",
         CrackFailure::NoCandidate => "no-candidate",
+        CrackFailure::TargetNotEncrypted => "target-not-encrypted",
         CrackFailure::BackendUnavailable { .. } => "backend-unavailable",
         CrackFailure::SessionFingerprintMismatch => "session-mismatch",
     }
@@ -708,6 +726,34 @@ mod tests {
 
         assert_eq!(controller.phase(), &Phase::Idle);
         assert!(controller.log().is_empty());
+        assert!(!controller.is_running());
+    }
+
+    #[test]
+    fn an_unencrypted_target_is_refused() {
+        // Arsip tanpa enkripsi terbuka dengan password apa pun, sehingga tanpa pemeriksaan
+        // ini kandidat pertama akan dilaporkan sebagai password yang ditemukan.
+        let directory = tempfile::tempdir().unwrap();
+        let archive = directory.path().join("plain.zip");
+        let file = std::fs::File::create(&archive).unwrap();
+        let mut writer = zip::ZipWriter::new(file);
+        writer
+            .start_file("plain.txt", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        std::io::Write::write_all(&mut writer, b"no password here").unwrap();
+        writer.finish().unwrap();
+
+        let words = wordlist(directory.path(), &["password"]);
+        let mut controller = Controller::default();
+        let result = controller.start(
+            wordlist_plan(&words),
+            CrackTarget::from_path(&archive),
+            &AttackLimits::default(),
+            fast_config(),
+            false,
+        );
+
+        assert_eq!(result.unwrap_err(), CrackFailure::TargetNotEncrypted);
         assert!(!controller.is_running());
     }
 

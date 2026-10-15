@@ -41,6 +41,7 @@ pub(crate) fn describe(failure: &CrackFailure) -> Description {
             vec![arg("total", total), arg("limit", limit)],
         ),
         CrackFailure::NoCandidate => ("error-no-candidate", vec![]),
+        CrackFailure::TargetNotEncrypted => ("error-not-encrypted", vec![]),
         CrackFailure::BackendUnavailable { backend, .. } => (
             "error-backend-unavailable",
             vec![arg("backend", backend_name(*backend))],

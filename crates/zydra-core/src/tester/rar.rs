@@ -39,15 +39,25 @@ pub struct RarTester {
 }
 
 impl RarTester {
-    /// Membuka arsip untuk mengenali versinya dan menghitung entrinya.
+    /// Membuka arsip untuk mengenali versinya dan keadaannya.
     pub fn open(path: &Path) -> Result<RarTester, CrackFailure> {
-        let encryption = detect_version(path)?;
+        let version = detect_version(path)?;
+        let (entries, any_encrypted) = scan(path);
+
+        // Versi arsip tetap dilaporkan walaupun isinya tidak terenkripsi, karena itu
+        // keterangan tentang formatnya, bukan tentang passwordnya.
+        let encryption = if any_encrypted {
+            version
+        } else {
+            EncryptionKind::None
+        };
+
         Ok(RarTester {
             path: path.to_path_buf(),
             info: TesterInfo {
                 kind: TargetKind::Rar,
                 encryption,
-                entries: count_entries(path),
+                entries,
             },
         })
     }
@@ -82,14 +92,27 @@ fn detect_version(path: &Path) -> Result<EncryptionKind, CrackFailure> {
     })
 }
 
-/// Menghitung entri dengan mendaftar arsip tanpa password.
+/// Menghitung entri dan mengenali apakah ada yang benar-benar terenkripsi.
 ///
-/// Daftar gagal pada arsip yang headernya ikut terenkripsi. Jumlah entri hanya keterangan
-/// tambahan, jadi kegagalan di sini tidak membuat arsipnya dianggap tidak bisa diuji.
-fn count_entries(path: &Path) -> usize {
+/// Versi arsip diambil dari tanda tangan, tetapi apakah isinya terenkripsi hanya bisa
+/// diketahui dengan membaca headernya. Keduanya berbeda: arsip RAR4 biasa belum tentu
+/// memakai password.
+///
+/// Kalau pendaftaran gagal, arsipnya dianggap terenkripsi. Kegagalan itu justru tanda
+/// header-nya ikut terenkripsi, dan menebak sebaliknya akan membuat berkas yang memang
+/// terkunci ditolak sebagai "tidak terenkripsi".
+fn scan(path: &Path) -> (usize, bool) {
     match Archive::new(path).open_for_listing() {
-        Ok(listing) => listing.filter(Result::is_ok).count(),
-        Err(_) => 0,
+        Ok(listing) => {
+            let mut entries = 0;
+            let mut any_encrypted = false;
+            for entry in listing.flatten() {
+                entries += 1;
+                any_encrypted |= entry.is_encrypted();
+            }
+            (entries, any_encrypted)
+        }
+        Err(_) => (0, true),
     }
 }
 
@@ -223,6 +246,18 @@ mod tests {
     fn the_rar5_version_is_detected() {
         let tester = RarTester::open(&fixture("rar5_encrypted.rar")).unwrap();
         assert_eq!(tester.info().encryption, EncryptionKind::RarCrypto5);
+    }
+
+    #[test]
+    fn an_unencrypted_archive_reports_no_encryption() {
+        // Versi arsip dan ada tidaknya enkripsi adalah dua hal berbeda. Arsip RAR4 biasa
+        // belum tentu memakai password, dan melaporkannya sebagai terenkripsi akan membuat
+        // berkas yang tidak terkunci ditolak sebagai "tidak terenkripsi" ketika justru
+        // sebaliknya yang benar.
+        let tester = RarTester::open(&fixture("rar4_plain.rar")).unwrap();
+        assert_eq!(tester.info().kind, TargetKind::Rar);
+        assert_eq!(tester.info().encryption, EncryptionKind::None);
+        assert!(tester.info().entries > 0, "no entries were counted");
     }
 
     #[test]
