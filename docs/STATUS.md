@@ -30,7 +30,7 @@ Yang **sudah selesai dan terverifikasi**:
 | Backend shadow | `src/tester/shadow.rs` | Selesai, teruji |
 | Sesi dan resume | `src/session/store.rs` | Selesai di core dan di CLI |
 
-Total **414 tes** lintas workspace, fmt bersih, clippy bersih.
+Total **418 tes** lintas workspace, fmt bersih, clippy bersih.
 
 Isi `zydra-core` yang sudah ada:
 
@@ -77,7 +77,7 @@ crate `zydra-gui`, CI, README, `LICENSE`, `NOTICE`.
 - 30 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
   `CARGO_BIN_EXE_zydra`: keempat format, mask, aturan mangling, resume, kedua bahasa,
   `--json`, `--quiet`, dan setiap kode keluar
-- 71 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
+- 72 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
   boleh ditekan", dan pengendali yang menjalankan serangan sungguhan sampai selesai
 Perintah yang sudah setara dengan `Zydra.py`:
 
@@ -261,78 +261,15 @@ lewat fixture tes, bukan diasumsikan.
 
 ## 7. Yang belum dikerjakan
 
-Urutan yang direncanakan. Setiap rencana menghasilkan software yang bisa dipakai sendiri.
+- **Ekspor log.** Satu-satunya fitur yang direncanakan dan belum ada.
+- **Panel pengaturan lanjutan di GUI** (jumlah worker, batas kombinasi). Nilainya masih
+  memakai bawaan.
+- **Tag rilis pertama.** Butuh persetujuan pemilik proyek, karena itu menerbitkan
+  sesuatu yang belum pernah dilihat berjalan di macOS dan Linux.
+- **Verifikasi CI.** Lihat bagian 8.
 
-**Plan A2 — menyelesaikan `zydra-core`.**
-
-Sudah selesai (dikerjakan langsung, bukan lewat subagent, karena sesi subagent terbukti
-bermasalah di repo ini):
-
-1. `attack` — `AttackPlan`, `AttackLimits`, `PreparedAttack::prepare`. Satu tempat yang
-   menerjemahkan pilihan pengguna menjadi sumber kandidat, supaya CLI dan GUI tidak
-   menulis aturan validasi dua kali.
-2. `log` — `LogLevel`, `LogEntry` (kunci i18n + argumen), `LogBuffer` cincin berbatas.
-3. `tester::zip` — ZipCrypto dan AES-256, membaca entri sampai habis.
-4. `tester::shadow` — lewat `pwhash::unix::verify`.
-5. `tester::factory` — Zip dan Shadow tersambung; Rar dan Pdf mengembalikan
-   `BackendUnavailable` dengan sebab `backend-not-built`.
-6. Tes end-to-end `tests/zip_end_to_end.rs` — membuat arsip terenkripsi sendiri lalu
-   memecahkannya lewat jalur lengkap.
-
-Sisa Plan A2:
-
-7. `tester::rar` — API sudah diverifikasi (lihat bagian 6). **Terhalang**: mesin ini tidak
-   punya 7-Zip, `rar`, maupun `unrar`, jadi fixture RAR tidak bisa dibuat di sini. Pilihan:
-   unduh satu fixture RAR terenkripsi kecil dari sumber publik lalu commit, atau tandai
-   tesnya `#[ignore]` dengan alasan jujur dan nyatakan di README bahwa RAR belum tercakup
-   tes otomatis.
-8. `tester::pdf` — API sudah diverifikasi. **Terhalang hal yang sama**: tidak ada `qpdf`
-   dan `lopdf` tidak bisa menulis PDF terenkripsi, jadi fixture PDF terenkripsi kecil harus
-   dibuat sekali di tempat lain lalu di-commit. Semantik `load_with_password` untuk password
-   salah harus dipastikan lewat fixture itu, jangan diasumsikan.
-
-**Plan A3 — frontend terminal.** Selesai. `zydra-i18n` (fluent, locale `en` + `id`,
-disematkan dengan `include_str!`) dan `zydra-cli` (clap, `indicatif`, `owo-colors`, kode
-keluar 0/1/2/3, `--json`, `--quiet`).
-
-Sisa yang belum dikerjakan, berurutan:
-
-1. **README, `LICENSE` GPL-3.0, `NOTICE`.** Belum ada sama sekali. `NOTICE` wajib memuat
-   atribusi MIT `hamedA2/Zydra` dan catatan lisensi UnRAR sebelum rilis pertama.
-2. `tester::rar` — API sudah diverifikasi (bagian 6). **Terhalang**: mesin ini tidak punya
-   7-Zip, `rar`, maupun `unrar`, jadi fixture RAR tidak bisa dibuat di sini.
-3. `tester::pdf` — API sudah diverifikasi. Terhalang hal yang sama.
-
-**Plan B — GUI.** Selesai untuk irisan pertama: `zydra-gui` dengan egui, tema Cyber
-Industrial, tata letak Sidebar + Workspace yang responsif, pengendali yang menghubungkan
-antarmuka ke mesin, konsol aktivitas, spanduk hasil dengan tombol salin, dan penggantian
-bahasa dari dalam jendela.
-
-Yang belum ada di GUI:
-
-- Panel pengaturan lanjutan (jumlah worker, batas kombinasi, byte verifikasi ZIP).
-- Panel untuk memilih dan memuat sesi yang tersimpan (menunggu `session` di Plan C).
-- Ekspor log dari antarmuka (menunggu ekspor log di Plan C).
-
-**Plan C — fitur lanjutan + rilis.**
-
-Sudah selesai:
-
-- CI di tiga sistem (ubuntu, macos, windows): format, lint, tes, build rilis, dengan
-  fail-fast dimatikan.
-- Tiga pemeriksaan aturan arsitektur sebagai job terpisah: `zydra-core` tidak boleh
-  menarik crate antarmuka, tidak boleh mencetak ke terminal, dan tidak boleh mengakhiri
-  proses sendiri.
-- Rilis otomatis saat push tag `v*`: empat paket (Windows MSVC, Linux x86_64, macOS arm64,
-  macOS x86_64), masing-masing memuat kedua binary, `LICENSE`, `LICENSE-MIT-Zydra.txt`,
-  `NOTICE`, dan `README.md`.
-
-Belum dikerjakan:
-
-- Ekspor log.
-- Peringatan saat target ternyata tidak terenkripsi.
-
-Keempat format, mask, aturan, dan resume sudah selesai di core, di CLI, dan di GUI.
+Semua yang lain sudah selesai dan teruji: keempat format, mask, aturan mangling, resume,
+dua bahasa, antarmuka grafis, dan pemeriksaan berkas tanpa enkripsi.
 
 ### Batasan yang diketahui, dan sebabnya
 
@@ -344,16 +281,16 @@ Keempat format, mask, aturan, dan resume sudah selesai di core, di CLI, dan di G
   sebagai arsip biasa dan berakhir "password tidak ditemukan", bukan kesalahan berkas.
   Pemeriksaan tanda tangan menangkap berkas yang jelas bukan RAR, tetapi tidak menangkap
   arsip yang rusak di tengah.
-- **Target yang tidak terenkripsi** akan melaporkan kandidat pertama sebagai cocok, karena
-  membuka berkas tanpa enkripsi berhasil dengan password apa pun. `TesterInfo::encryption`
-  sudah menyimpan keadaan ini, jadi antarmuka bisa memperingatkan; belum dikerjakan.
+- **Argumen baris perintah dikonversi secara lossy.** Jalur yang bukan UTF-8 akan ditolak
+  oleh lapisan berkas dengan pesan biasa alih-alih membuat program panik, tetapi jalur
+  seperti itu tidak bisa dipakai.
 
-### Cara memeriksa CI
+## 8. Cara memeriksa CI
 
 CI berjalan di GitHub Actions. Dari mesin ini tidak bisa diperiksa langsung: tidak ada
-`gh` CLI, dan tidak ada token GitHub di environment. Yang bisa diverifikasi di lokal
-adalah ketiga pemeriksaan aturan arsitektur, dan itu sudah dilakukan sebelum commit
-pertama supaya tidak false-positive.
+`gh` CLI, dan tidak ada token GitHub di environment. Yang bisa diverifikasi di lokal sudah
+dilakukan: ketiga pemeriksaan aturan arsitektur diuji sebelum commit pertama supaya tidak
+false-positive, dan kedua berkas workflow divalidasi dengan parser YAML sungguhan.
 
 Kalau CI merah, tiga penyebab yang paling mungkin, berurutan:
 
@@ -361,43 +298,34 @@ Kalau CI merah, tiga penyebab yang paling mungkin, berurutan:
 2. `rust-version` di `Cargo.toml` memaksa versi dependensi lama di salah satu runner.
 3. Perbedaan perilaku berkas atau baris baru antara Windows dan Unix.
 
-### Jebakan yang sudah terbayar di GUI
+## 9. Cacat yang ditemukan dari menjalankan alatnya, bukan dari membaca kode
 
-- **`rust-version` kembali memilih versi lama.** `cargo add eframe` mengambil 0.32.3
-  padahal yang tersedia 0.36.2. Tetap dipakai 0.32.3 supaya tidak mengejar MSRV lagi.
-  API egui 0.32 sudah diverifikasi langsung dari sumber crate-nya.
-- **`Stroke::new(1.0, ..)` memicu peringatan `float_literal_f32_fallback`** yang akan
-  menjadi kesalahan di rilis Rust berikutnya. Di tema dipakai konstanta `HAIRLINE`;
-  di widget dipakai sufiks `1.0_f32`.
-- **`cargo add <crate>` untuk tes tidak cukup.** Tes integrasi tidak bisa memakai
-  dependensi biasa, jadi `zip`, `tempfile`, dan `crossbeam-channel` juga harus ada di
-  `[dev-dependencies]` pada crate yang mengujinya.
+Dicatat karena polanya berulang dan berulang, dan karena semuanya sudah mahal:
 
-Catatan: `TesterInfo.encryption` dan `CrackFailure` sudah memuat varian untuk RAR dan PDF,
-dan `Backend` sudah punya `Rar` dan `Pdf`. Jadi menambahkan kedua backend itu tidak perlu
-mengubah tipe yang sudah ada.
+1. **`seek` meleset satu langkah.** Rencana menempatkan odometer *pada* kandidat ke-`index`,
+   padahal `next_candidate` selalu memajukan lebih dulu. Empat tes rencana gagal.
+2. **Livelock pada sumber brute force.** `advance` me-reset odometer ke nol saat ruangnya
+   habis, sehingga panggilan berikutnya memulai ulang dari awal. Dua worker menelusuri
+   ruang yang sama tanpa henti, dan brute force yang passwordnya tidak ada tidak pernah
+   melaporkan "tidak ditemukan". Gejalanya menyamar sebagai tes menggantung; yang
+   membongkarnya adalah 63 detik CPU pada satu proses.
+3. **Klaim "terhalang" yang salah.** Saya menulis bahwa RAR dan PDF tidak bisa dikerjakan
+   karena tidak ada tool pembuat fixture. PyMuPDF sudah terpasang, dan libarchive
+   menerbitkan fixture RAR. Tidak ada yang terhalang.
+4. **Posisi resume yang mundur.** Mesin menghitung kandidat sejak ia dijalankan, bukan
+   sejak awal ruang pencarian, jadi posisi yang tersimpan mundur setiap kali serangan
+   dilanjutkan lalu dihentikan lagi. Hanya terlihat dengan menjalankan resume dua kali
+   berturut-turut dan membandingkan angka di berkas sesi.
+5. **Pelacak sesi yang menyimpan sidik jari saat dibuat.** Pelacak yang hidup lebih lama
+   daripada berkasnya menganggap berkas yang sudah berubah masih cocok. Di produksi tidak
+   terlihat karena pelacaknya dibuat per-start; yang menemukannya adalah tes yang memakai
+   pelacak berumur panjang.
+6. **RAR melaporkan keadaan enkripsi dari tanda tangan, bukan dari isinya.** Arsip RAR4
+   biasa belum tentu memakai password. Kalau tidak diperbaiki, pemeriksaan berkas tanpa
+   enkripsi yang baru justru akan menolak arsip yang memang terkunci.
+7. **Label tampil sebagai kunci mentah di CLI**, kata "Password" muncul dua kali, dan
+   baris log menduplikasi baris Target. Ketiganya ketahuan dari melihat keluaran binary-nya
+   sendiri, bukan dari tes yang sudah ada.
 
-## 8. Aturan yang tidak boleh dilanggar
-
-Diambil dari bagian Global Constraints spec. Aturan ini yang membuat proyek tetap modular.
-
-- `zydra-core` **tidak boleh** bergantung pada crate UI apa pun.
-- `zydra-core` **tidak boleh** memuat kalimat yang dilihat pengguna. Tidak ada `println!`
-  atau string pesan berbahasa manusia di dalamnya.
-- `zydra-core` **tidak boleh** memanggil `std::process::exit`.
-- Kesalahan masukan pengguna memakai `CrackFailure`. Kesalahan prasarana memakai
-  `CoreError`. Tidak boleh tumpang tindih.
-- Semua angka ajaib hidup di `constants.rs`.
-- Akhir baris LF di repositori (diatur `.gitattributes`).
-- Lisensi `GPL-3.0-or-later`; atribusi MIT `hamedA2/Zydra` dan catatan lisensi UnRAR
-  wajib ada di `NOTICE` saat Plan A3.
-
-## 9. Konvensi commit
-
-Baris pertama: `type(scope): ringkasan` yang informatif dan searchable, sekaligus witty —
-dan **tiap commit jokesnya berbeda**, jangan template. Body 2–3 baris berisi "kenapa"-nya
-secara teknis. Cerita panjang masuk ke berkas ini, bukan ke commit message.
-
-Identitas commit: `zabuzanotdev <290258795+zabuzanotdev@users.noreply.github.com>`
-(sudah menjadi default global di mesin ini). Verifikasi dengan
-`git log -1 --format="%an <%ae>"` setelah commit.
+Kesimpulan yang berlaku untuk pekerjaan berikutnya: **jalankan alatnya, jangan hanya
+membacanya.** Tujuh cacat di atas semuanya lolos dari pembacaan ulang kode.
