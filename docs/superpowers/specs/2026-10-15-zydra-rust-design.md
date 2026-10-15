@@ -183,21 +183,28 @@ berkas yang memuat `shadow` (tanpa membedakan huruf besar-kecil). Sisanya `Unsup
 Deteksi berdasarkan ekstensi saja, tidak membaca isi berkas — berbeda dari versi Python yang juga hanya
 memakai ekstensi, tetapi sekarang hasilnya enum bertipe, bukan string.
 
-`CrackFailure` — enum, tanpa teks:
+`CrackFailure` — enum, tanpa teks. Berisi **kesalahan yang disebabkan masukan pengguna**; kesalahan
+prasarana (I/O, berkas rusak) tinggal di `CoreError` (6.9). Pemisahan ini yang membuat lapisan tepi tahu
+mana yang perlu diterjemahkan untuk pengguna dan mana yang cukup dicatat sebagai kesalahan teknis.
 
 ```
 PasswordNotFound
 UnsupportedFormat { display_name: String }
-Rar5NotSupported
 EmptyWordlist
 FileUnreadable { reason: String }
 NoCharsetSelected
 InvalidLengthRange { min: u8, max: u8, allowed_max: u8 }
+InvalidMask { pattern: String, reason: String }
+InvalidRule { rule: String, reason: String }
 TooManyCombinations { total: u64, limit: u64 }
 NoCandidate
 BackendUnavailable { backend: Backend, reason: String }
 SessionFingerprintMismatch
 ```
+
+`Rar5NotSupported` dihapus dari daftar: keputusan 3 menyatakan RAR4 dan RAR5 keduanya didukung, jadi
+varian itu tidak punya keadaan yang bisa diwakilinya. Kalau build dibuat tanpa dukungan RAR, yang terjadi
+adalah `BackendUnavailable { backend: Backend::Rar, .. }` — satu keadaan, satu cara dinyatakan.
 
 Tidak ada varian `Cancelled` di sini: pembatalan adalah kejadian mesin, bukan kegagalan pemulihan
 password, sehingga diwakili `EngineEvent::Cancelled` (lihat 6.4). Satu keadaan hanya punya satu cara
@@ -228,10 +235,13 @@ mengembalikan `0.0`, bukan `NaN` (versi Python tidak menjaga hal ini). `TryingDa
 enum supaya state UI "sedang berjalan" (9.3) tidak bisa memuat varian `Found` atau `Failed` yang tidak
 masuk akal di sana.
 
-`CharsetKey`: `Lowercase`, `Uppercase`, `Digits`, `Symbols`, `Space`.
-`CharsetSet` adalah bitflag; `alphabet()` menyusunnya dalam urutan tetap dan membuang duplikat;
-`total_combinations(min, max)` menjenuhkan ke `u64::MAX` saat melimpah, bukan membungkus.
-`CharsetSet::Letters` bukan varian tersendiri — kombinasi `Lowercase | Uppercase` yang dipakai.
+Kelas karakter: `lowercase`, `uppercase`, `digits`, `symbols`, `space`.
+`CharsetSet` adalah bitflag dengan satu konstanta per kelas; `alphabet()` menyusunnya dalam urutan tetap
+dan membuang duplikat; `total_combinations(min, max)` menjenuhkan ke `u64::MAX` saat melimpah, bukan
+membungkus. Tidak ada varian `letters` — kombinasi `LOWERCASE | UPPERCASE` yang dipakai. `CharsetSet`
+adalah **satu-satunya** tipe untuk konsep ini: nama-nama kelas adalah konstanta bitflag di dalamnya,
+bukan enum terpisah. Dua tipe untuk satu konsep hanya menghasilkan kode konversi yang harus dijaga
+tanpa manfaat.
 
 `MaskPattern::parse(&str)` menerima token gaya hashcat: `?l` `?u` `?d` `?s` `?b` `?a` dan karakter
 literal. `?a` adalah gabungan semua kelas. Pola kosong, token tidak dikenal, atau `?` di akhir adalah
@@ -325,7 +335,7 @@ pub struct EngineConfig {
 
 pub enum EngineEvent {
     Started { total: u64 },
-    Progress { tried: u64, total: u64, speed_per_second: u64, elapsed: Duration, eta: Option<Duration> },
+    Progress(TryingData),
     Found { password: String, detail: Option<String> },
     Exhausted,
     Cancelled,
@@ -334,12 +344,17 @@ pub enum EngineEvent {
 
 pub fn run(
     source: Box<dyn CandidateSource>,
-    factory: &dyn TesterFactory,
-    target: &CrackTarget,
+    factory: Arc<dyn TesterFactory>,
+    target: CrackTarget,
     config: EngineConfig,
     cancel: CancelToken,
 ) -> Receiver<EngineEvent>
 ```
+
+`factory` dan `target` diterima sebagai nilai milik (bukan referensi) karena `run` mengembalikan segera
+dan pekerjaannya berlanjut di thread terpisah: data yang dipindahkan ke thread wajib berumur `'static`.
+`Arc<dyn TesterFactory>` membuat factory bisa dibagikan ke semua worker tanpa duplikasi pekerjaan mahal
+seperti membaca header arsip.
 
 Cara kerja:
 
@@ -450,6 +465,23 @@ Semua angka ajaib berkumpul di sini: ukuran batch, interval progres, batas kombi
 force maksimum, jumlah byte verifikasi, faktor penghalusan kecepatan, interval simpan sesi, ukuran
 jendela minimum, batas breakpoint GUI. Tidak ada angka telanjang yang tersebar di modul lain.
 
+### 6.9 `error.rs`
+
+`CoreError` memuat **kesalahan prasarana**, bukan kesalahan masukan pengguna (yang tinggal di
+`CrackFailure`, 6.1):
+
+```
+Io(std::io::Error)
+ConfigInvalid { detail: String }
+SessionCorrupt { detail: String }
+SessionIo { detail: String }
+```
+
+Pesan `thiserror` di sini bersifat teknis dan ditujukan untuk catatan/log, bukan untuk ditampilkan ke
+pengguna. Lapisan tepi (`zydra-cli`, `zydra-gui`) selalu memetakan `CoreError` ke satu key i18n umum
+(`error-unknown`) ditambah detail teknis di log — sehingga tidak ada kalimat berbahasa Inggris yang
+bocor ke antarmuka pengguna.
+
 ## 7. Backend format
 
 | Format | Crate | Cara verifikasi | Perbaikan atas versi Python |
@@ -496,7 +528,7 @@ workspace-status-idle, workspace-status-analyzing, workspace-status-cracking-zip
 stat-speed, stat-eta, stat-elapsed, stat-tried, stat-value-unknown, stat-value-speed, stat-value-tried
 log-panel-title, log-panel-empty, log-panel-exported
 result-granted, result-denied, result-key, result-detail
-error-unsupported-format, error-rar5-unsupported, error-empty-wordlist, error-no-match, error-file-unreadable, error-no-charset, error-bad-range, error-too-many-combinations, error-no-candidate, error-backend-unavailable, error-session-mismatch, error-unknown
+error-unsupported-format, error-empty-wordlist, error-no-match, error-file-unreadable, error-no-charset, error-bad-range, error-invalid-mask, error-invalid-rule, error-too-many-combinations, error-no-candidate, error-backend-unavailable, error-session-mismatch, error-unknown
 settings-title, settings-language, settings-language-auto, settings-workers, settings-workers-auto, settings-max-combinations, settings-max-brute-length, settings-rar-mode, settings-rar-auto, settings-rar4, settings-rar5, settings-zip-verify-bytes, settings-save, settings-reset
 cli-about, cli-help-file, cli-help-wordlist, cli-help-charset, cli-help-min, cli-help-max, cli-help-mask, cli-help-rules, cli-help-threads, cli-help-lang, cli-help-json, cli-help-resume, cli-help-quiet
 ```
