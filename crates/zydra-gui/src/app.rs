@@ -41,6 +41,8 @@ impl ZydraApp {
     /// Membuat aplikasi dan menerapkan temanya.
     pub fn new(context: &eframe::CreationContext<'_>) -> ZydraApp {
         let theme = Theme::default();
+        // Font dipasang sebelum tema supaya ukuran teks dihitung dengan huruf yang benar.
+        crate::fonts::apply(&context.egui_ctx);
         theme.apply(&context.egui_ctx);
         theme.apply_spacing(&context.egui_ctx);
 

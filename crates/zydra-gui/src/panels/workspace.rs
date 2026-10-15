@@ -92,8 +92,8 @@ fn progress_section(
     ui.horizontal(|ui| {
         ui.label(
             egui::RichText::new(format::percent(fraction))
+                .family(crate::fonts::display_family())
                 .size(theme.type_scale.display)
-                .monospace()
                 .color(theme.text),
         );
         ui.label(
