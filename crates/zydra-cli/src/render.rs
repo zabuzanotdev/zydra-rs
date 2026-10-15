@@ -180,15 +180,7 @@ impl Reporter {
 
 /// Durasi sebagai `HH:MM:SS`, atau `MM:SS` kalau di bawah satu jam.
 pub fn format_duration(duration: Duration) -> String {
-    let total_seconds = duration.as_secs();
-    let hours = total_seconds / 3_600;
-    let minutes = (total_seconds % 3_600) / 60;
-    let seconds = total_seconds % 60;
-    if hours > 0 {
-        format!("{hours:02}:{minutes:02}:{seconds:02}")
-    } else {
-        format!("{minutes:02}:{seconds:02}")
-    }
+    zydra_i18n::format::duration(duration)
 }
 
 #[cfg(test)]

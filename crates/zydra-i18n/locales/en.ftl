@@ -80,3 +80,46 @@ log-level-success = OK
 
 # Progress
 progress-line = { $tried } of { $total } tried, { $speed } per second, ETA { $eta }
+
+# Window
+app-window-title = Zydra — password recovery
+app-subtitle = RECOVERY CORE
+
+# Actions
+action-start = START DECRYPTION
+action-stop = STOP
+action-reset = NEW RUN
+action-browse = Browse
+action-copy = Copy password
+action-copied = Copied
+action-options = Options
+
+# Sidebar
+sidebar-target = Target file
+sidebar-target-empty = No file selected
+sidebar-method = Method
+sidebar-method-dictionary = Dictionary
+sidebar-method-brute-force = Brute force
+sidebar-wordlist = Wordlist
+sidebar-wordlist-empty = No wordlist selected
+sidebar-charset = Character set
+charset-lowercase = Lowercase a–z
+charset-uppercase = Uppercase A–Z
+charset-digits = Digits 0–9
+charset-symbols = Symbols !#%
+charset-space = Space
+sidebar-min-length = Min length
+sidebar-max-length = Max length
+sidebar-combinations = Combinations
+
+# Workspace
+workspace-status-idle = Ready
+workspace-status-analyzing = Analyzing…
+workspace-status-running = Decrypting…
+workspace-status-done = Finished
+workspace-status-failed = Failed
+workspace-status-cancelled = Stopped
+workspace-progress = Progress
+workspace-activity = Activity
+log-panel-empty = No activity yet
+stat-elapsed = elapsed

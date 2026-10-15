@@ -81,3 +81,46 @@ log-level-success = BERHASIL
 
 # Progres
 progress-line = { $tried } dari { $total } dicoba, { $speed } per detik, sisa waktu { $eta }
+
+# Jendela
+app-window-title = Zydra — pemulihan password
+app-subtitle = INTI PEMULIHAN
+
+# Aksi
+action-start = MULAI DEKRIPSI
+action-stop = HENTIKAN
+action-reset = MULAI ULANG
+action-browse = Pilih
+action-copy = Salin password
+action-copied = Tersalin
+action-options = Opsi
+
+# Panel samping
+sidebar-target = Berkas target
+sidebar-target-empty = Belum ada berkas
+sidebar-method = Metode
+sidebar-method-dictionary = Kamus
+sidebar-method-brute-force = Brute force
+sidebar-wordlist = Wordlist
+sidebar-wordlist-empty = Belum ada wordlist
+sidebar-charset = Kelas karakter
+charset-lowercase = Huruf kecil a–z
+charset-uppercase = Huruf besar A–Z
+charset-digits = Angka 0–9
+charset-symbols = Simbol !#%
+charset-space = Spasi
+sidebar-min-length = Panjang min
+sidebar-max-length = Panjang maks
+sidebar-combinations = Kombinasi
+
+# Area kerja
+workspace-status-idle = Siap
+workspace-status-analyzing = Menganalisis…
+workspace-status-running = Mendekripsi…
+workspace-status-done = Selesai
+workspace-status-failed = Gagal
+workspace-status-cancelled = Dihentikan
+workspace-progress = Kemajuan
+workspace-activity = Aktivitas
+log-panel-empty = Belum ada aktivitas
+stat-elapsed = durasi
