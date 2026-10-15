@@ -315,8 +315,38 @@ Yang belum ada di GUI:
 - Panel untuk memilih dan memuat sesi yang tersimpan (menunggu `session` di Plan C).
 - Ekspor log dari antarmuka (menunggu ekspor log di Plan C).
 
-**Plan C — fitur lanjutan + rilis.** `session` (resume), `config`, mask, rules, panel
-settings, ekspor log, CI 3 OS, dan rilis otomatis saat tag.
+**Plan C — fitur lanjutan + rilis.**
+
+Sudah selesai:
+
+- CI di tiga sistem (ubuntu, macos, windows): format, lint, tes, build rilis, dengan
+  fail-fast dimatikan.
+- Tiga pemeriksaan aturan arsitektur sebagai job terpisah: `zydra-core` tidak boleh
+  menarik crate antarmuka, tidak boleh mencetak ke terminal, dan tidak boleh mengakhiri
+  proses sendiri.
+- Rilis otomatis saat push tag `v*`: empat paket (Windows MSVC, Linux x86_64, macOS arm64,
+  macOS x86_64), masing-masing memuat kedua binary, `LICENSE`, `LICENSE-MIT-Zydra.txt`,
+  `NOTICE`, dan `README.md`.
+
+Belum dikerjakan:
+
+- `session` (resume serangan panjang) dan `config` (pengaturan tersimpan).
+- Mask attack dan aturan mangling.
+- Panel pengaturan lanjutan di GUI.
+- Ekspor log.
+
+### Cara memeriksa CI
+
+CI berjalan di GitHub Actions. Dari mesin ini tidak bisa diperiksa langsung: tidak ada
+`gh` CLI, dan tidak ada token GitHub di environment. Yang bisa diverifikasi di lokal
+adalah ketiga pemeriksaan aturan arsitektur, dan itu sudah dilakukan sebelum commit
+pertama supaya tidak false-positive.
+
+Kalau CI merah, tiga penyebab yang paling mungkin, berurutan:
+
+1. Dependensi sistem Linux kurang. `rfd` memakai xdg-portal dan wayland, bukan GTK.
+2. `rust-version` di `Cargo.toml` memaksa versi dependensi lama di salah satu runner.
+3. Perbedaan perilaku berkas atau baris baru antara Windows dan Unix.
 
 ### Jebakan yang sudah terbayar di GUI
 

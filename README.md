@@ -2,6 +2,7 @@
   <img src="https://img.shields.io/badge/status-dalam%20pengembangan-orange" alt="Status: dalam pengembangan">
   <img src="https://img.shields.io/badge/lisensi-GPL--3.0--or--later-blue" alt="Lisensi: GPL-3.0 atau lebih baru">
   <img src="https://img.shields.io/badge/rust-stable-dea584" alt="Rust stable">
+  <img src="https://github.com/zabuzanotdev/zydra-rs/actions/workflows/ci.yml/badge.svg" alt="CI">
 </p>
 
 # Zydra
