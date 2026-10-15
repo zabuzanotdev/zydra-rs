@@ -83,3 +83,26 @@ Komponen pihak ketiga
    pemeriksa lisensi. Sebelum rilis pertama, jalankan `cargo deny check licenses`
    atau `cargo license` untuk memastikannya, dan perbarui bagian ini kalau ada
    yang menyimpang.
+
+4. Berkas uji
+   ------------
+   crates/zydra-core/tests/fixtures/encrypted.pdf
+
+     Dibuat oleh crates/zydra-core/tests/fixtures/make_encrypted_pdf.py, yang
+     disertakan di repositori ini. Tidak ada berkas pihak ketiga; skripnya
+     menerapkan algoritma dari ISO 32000-1 (revisi 2, RC4 40 bit) dan merupakan
+     karya proyek ini.
+
+   crates/zydra-core/tests/fixtures/rar4_encrypted.rar
+
+     Berasal dari kumpulan berkas uji libarchive, diambil dari
+     libarchive/test/test_read_format_rar4_encrypted.rar.uu dan didekode dari
+     uuencode.
+
+       libarchive
+       Copyright (c) 2003-2018, semua hak dilindungi
+       Lisensi BSD 2-Klausul
+       https://github.com/libarchive/libarchive
+
+     Berkas itu hanya dipakai sebagai bahan pengujian dan tidak ikut ke dalam
+     binary hasil build. Password-nya didokumentasikan di dalam tes.

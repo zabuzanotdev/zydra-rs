@@ -4,6 +4,7 @@
 //! tinggal di modul `zip`, `rar`, `pdf`, dan `shadow`.
 
 pub mod factory;
+pub mod pdf;
 pub mod shadow;
 pub mod zip;
 

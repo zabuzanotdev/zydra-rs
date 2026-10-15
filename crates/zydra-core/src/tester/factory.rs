@@ -6,6 +6,7 @@
 use crate::constants::DEFAULT_ZIP_MAX_ENTRY_BYTES;
 use crate::model::failure::{Backend, CrackFailure};
 use crate::model::target::{CrackTarget, TargetKind};
+use crate::tester::pdf::PdfTester;
 use crate::tester::shadow::ShadowTester;
 use crate::tester::zip::ZipTester;
 use crate::tester::{PasswordTester, TesterFactory};
@@ -45,14 +46,11 @@ impl TesterFactory for DefaultTesterFactory {
                 self.zip_max_entry_bytes,
             )?)),
             TargetKind::Shadow => Ok(Box::new(ShadowTester::open(&target.path)?)),
-            // Backend RAR dan PDF belum ada di build ini. Sebabnya dinyatakan apa adanya
-            // supaya antarmuka bisa menampilkan pesan yang benar, bukan pesan umum.
+            TargetKind::Pdf => Ok(Box::new(PdfTester::open(&target.path)?)),
+            // Backend RAR belum ada di build ini. Sebabnya dinyatakan apa adanya supaya
+            // antarmuka bisa menampilkan pesan yang benar, bukan pesan umum.
             TargetKind::Rar => Err(CrackFailure::BackendUnavailable {
                 backend: Backend::Rar,
-                reason: "backend-not-built".to_string(),
-            }),
-            TargetKind::Pdf => Err(CrackFailure::BackendUnavailable {
-                backend: Backend::Pdf,
                 reason: "backend-not-built".to_string(),
             }),
             TargetKind::Unsupported => Err(CrackFailure::UnsupportedFormat {
@@ -65,6 +63,7 @@ impl TesterFactory for DefaultTesterFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tester::EncryptionKind;
     use std::io::Write;
     use zip::write::SimpleFileOptions;
 
@@ -110,25 +109,29 @@ mod tests {
     }
 
     #[test]
-    fn rar_and_pdf_report_that_their_backend_is_missing() {
+    fn rar_reports_that_its_backend_is_missing() {
         let factory = DefaultTesterFactory::new();
-        for (kind, backend) in [
-            (TargetKind::Rar, Backend::Rar),
-            (TargetKind::Pdf, Backend::Pdf),
-        ] {
-            let target = CrackTarget {
-                kind,
-                path: "whatever".into(),
-                display_name: "whatever".to_string(),
-            };
-            match factory.create(&target) {
-                Err(CrackFailure::BackendUnavailable { backend: got, .. }) => {
-                    assert_eq!(got, backend)
-                }
-                Err(other) => panic!("unexpected failure: {other:?}"),
-                Ok(_) => panic!("expected a failure for {kind:?}"),
+        let target = CrackTarget {
+            kind: TargetKind::Rar,
+            path: "whatever".into(),
+            display_name: "whatever".to_string(),
+        };
+        match factory.create(&target) {
+            Err(CrackFailure::BackendUnavailable { backend, .. }) => {
+                assert_eq!(backend, Backend::Rar)
             }
+            Err(other) => panic!("unexpected failure: {other:?}"),
+            Ok(_) => panic!("expected a failure for RAR"),
         }
+    }
+
+    #[test]
+    fn a_pdf_target_produces_a_pdf_tester() {
+        let fixture = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/encrypted.pdf");
+        let target = CrackTarget::from_path(fixture);
+        let tester = DefaultTesterFactory::new().create(&target).unwrap();
+        assert_eq!(tester.info().kind, TargetKind::Pdf);
+        assert_eq!(tester.info().encryption, EncryptionKind::PdfStandard);
     }
 
     #[test]

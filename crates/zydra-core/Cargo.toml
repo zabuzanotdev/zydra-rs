@@ -11,6 +11,7 @@ description = "Logika pemulihan password untuk arsip terenkripsi. Tanpa dependen
 [dependencies]
 bitflags.workspace = true
 crossbeam-channel.workspace = true
+lopdf = "0.42.0"
 num_cpus.workspace = true
 pwhash.workspace = true
 thiserror.workspace = true
