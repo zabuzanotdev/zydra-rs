@@ -7,6 +7,10 @@
 # Sesi brainstorming (mockup, state server)
 .superpowers/
 
+# Dokumen kerja internal: spec desain, rencana, catatan status.
+# Disimpan di lokal saja dan tidak ikut ke repositori.
+docs/
+
 # IDE
 .idea/
 .vscode/
