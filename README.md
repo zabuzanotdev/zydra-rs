@@ -29,6 +29,8 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 |---|---|
 | Serangan wordlist | Berfungsi |
 | Serangan brute force (kelas karakter, panjang min/max) | Berfungsi |
+| **Mask attack** (`?l?l?d?d`) | Berfungsi |
+| **Aturan mangling** (`capitalize+append-digits:9`) | Berfungsi |
 | **ZIP** (ZipCrypto dan AES-256) | Berfungsi |
 | **Berkas `shadow` Unix** (md5, sha256, sha512, bcrypt, des) | Berfungsi |
 | Antarmuka baris perintah | Berfungsi |
@@ -37,10 +39,9 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | **RAR** | **Belum ada.** Perintah akan melaporkan bahwa backend-nya tidak tersedia |
 | **PDF** | **Belum ada.** Sama |
 | Resume serangan panjang | Belum ada |
-| Mask attack dan aturan mangling | Belum ada |
 | Rilis siap unduh | Belum ada |
 
-Pengujian: **248 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
+Pengujian: **340 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
 ---
 
@@ -80,6 +81,45 @@ zydra -f vault.zip -b letters,digits -m 1 -x 4
 
 Kelas karakter yang tersedia: `lowercase`, `uppercase`, `digits`, `symbols`, `space`, dan
 `letters` (gabungan huruf kecil dan besar). Beberapa kelas bisa digabung dengan koma.
+
+### Mask
+
+Ketika bentuk passwordnya sudah bisa diduga, mask jauh lebih hemat daripada brute force
+biasa. Setiap posisi punya kelasnya sendiri:
+
+```bash
+zydra -f vault.zip --mask "?l?l?l?l?d?d"
+```
+
+| Token | Arti |
+|---|---|
+| `?l` | huruf kecil |
+| `?u` | huruf besar |
+| `?d` | angka |
+| `?s` | tanda baca |
+| `?a` | gabungan keempatnya |
+| `??` | karakter `?` biasa |
+
+Karakter lain dipakai apa adanya, jadi `admin?d?d` hanya mencoba `admin00` sampai
+`admin99`.
+
+### Aturan mangling
+
+Aturan menghasilkan variasi dari setiap kandidat wordlist. Koma memisahkan alternatif,
+tanda tambah merantai aturan:
+
+```bash
+zydra -f vault.zip -d words.txt --rules "none,capitalize,leet,capitalize+append-digits:9"
+```
+
+Aturan yang tersedia: `none`, `capitalize`, `upper`, `lower`, `reverse`, `leet`,
+`append-digits`, `prepend-digits`, `append-symbols`. Aturan angka menerima batas opsional,
+misalnya `append-digits:4`.
+
+Rantai `capitalize+append-digits:9` mengubah kata `admin` menjadi `Admin0` sampai
+`Admin9` — pola password yang paling sering dipakai orang, dan itu sebabnya rantai
+didukung: tanpa rantai, aturan hanya bisa diterapkan berdampingan pada kata dasar, dan
+kombinasi itu tidak akan pernah tercoba.
 
 ### Berkas `shadow` Unix
 
@@ -244,6 +284,8 @@ worse than one that admits the gap.
 |---|---|
 | Wordlist attack | Works |
 | Brute-force attack (character classes, min/max length) | Works |
+| **Mask attack** (`?l?l?d?d`) | Works |
+| **Mangling rules** (`capitalize+append-digits:9`) | Works |
 | **ZIP** (ZipCrypto and AES-256) | Works |
 | **Unix `shadow` files** (md5, sha256, sha512, bcrypt, des) | Works |
 | Command-line interface | Works |
@@ -252,10 +294,9 @@ worse than one that admits the gap.
 | **RAR** | **Not implemented.** Reports that the backend is unavailable |
 | **PDF** | **Not implemented.** Same |
 | Resuming long attacks | Not started |
-| Mask attacks and mangling rules | Not started |
 | Downloadable releases | Not started |
 
-Testing: **248 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
+Testing: **340 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
 ## Usage
 

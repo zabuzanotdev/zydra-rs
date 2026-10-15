@@ -20,7 +20,7 @@ Yang **sudah selesai dan terverifikasi**:
 |---|---|---|
 | Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 11 kali |
 | Plan A1 | `docs/superpowers/plans/2026-10-15-zydra-core-engine.md` | 9 tugas, selesai semua |
-| `zydra-core` | `crates/zydra-core/` | Selesai untuk ZIP dan shadow |
+| `zydra-core` | `crates/zydra-core/` | Selesai untuk ZIP dan shadow, termasuk mask dan aturan mangling |
 | `zydra-i18n` | `crates/zydra-i18n/` | Selesai, locale en + id |
 | `zydra-cli` | `crates/zydra-cli/` | Selesai, menggantikan `Zydra.py` untuk ZIP dan shadow |
 | `zydra-gui` | `crates/zydra-gui/` | Selesai untuk tata letak Sidebar + Workspace yang responsif |
@@ -29,7 +29,7 @@ Yang **sudah selesai dan terverifikasi**:
 | Backend RAR | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
 | Backend PDF | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
 
-Total **248 tes** lintas workspace, fmt bersih, clippy bersih.
+Total **340 tes** lintas workspace, fmt bersih, clippy bersih.
 
 Isi `zydra-core` yang sudah ada:
 
@@ -73,10 +73,10 @@ crate `zydra-gui`, CI, README, `LICENSE`, `NOTICE`.
   memecahkannya lewat jalur lengkap `AttackPlan` → `DefaultTesterFactory` → `ZipTester`
   → `engine::run`
 - 23 tes `zydra-i18n`
-- 28 tes unit `zydra-cli`
-- 17 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
-  `CARGO_BIN_EXE_zydra`: kedua mode serangan, kedua bahasa, `--json`, `--quiet`, dan setiap
-  kode keluar
+- 34 tes unit `zydra-cli`
+- 24 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
+  `CARGO_BIN_EXE_zydra`: kedua mode serangan, mask, aturan mangling, kedua bahasa,
+  `--json`, `--quiet`, dan setiap kode keluar
 - 52 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
   boleh ditekan", dan pengendali yang menjalankan serangan sungguhan sampai selesai
 
@@ -331,9 +331,13 @@ Sudah selesai:
 Belum dikerjakan:
 
 - `session` (resume serangan panjang) dan `config` (pengaturan tersimpan).
-- Mask attack dan aturan mangling.
-- Panel pengaturan lanjutan di GUI.
+- Panel pengaturan lanjutan di GUI, termasuk masukan mask dan aturan. Katalog teksnya
+  belum ditulis; tambahkan bersamaan dengan panelnya supaya tidak menulis kata yang nanti
+  berubah.
 - Ekspor log.
+
+Mask dan aturan mangling sudah selesai di core dan di CLI. GUI belum bisa memakainya
+karena panelnya belum ada; mesinnya sudah siap dan tidak perlu diubah lagi.
 
 ### Cara memeriksa CI
 
