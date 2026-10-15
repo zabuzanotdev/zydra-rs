@@ -18,18 +18,18 @@ Yang **sudah selesai dan terverifikasi**:
 
 | Lapisan | Berkas | Status |
 |---|---|---|
-| Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 10 kali |
+| Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 11 kali |
 | Plan A1 | `docs/superpowers/plans/2026-10-15-zydra-core-engine.md` | 9 tugas, selesai semua |
 | `zydra-core` | `crates/zydra-core/` | Selesai untuk ZIP dan shadow |
 | `zydra-i18n` | `crates/zydra-i18n/` | Selesai, locale en + id |
 | `zydra-cli` | `crates/zydra-cli/` | Selesai, menggantikan `Zydra.py` untuk ZIP dan shadow |
+| `zydra-gui` | `crates/zydra-gui/` | Selesai untuk tata letak Sidebar + Workspace yang responsif |
 | Backend ZIP | `src/tester/zip.rs` | Selesai, teruji end-to-end |
 | Backend shadow | `src/tester/shadow.rs` | Selesai, teruji |
 | Backend RAR | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
 | Backend PDF | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
-| GUI | — | **Belum ada** |
 
-Total **191 tes** lintas workspace, fmt bersih, clippy bersih.
+Total **248 tes** lintas workspace, fmt bersih, clippy bersih.
 
 Isi `zydra-core` yang sudah ada:
 
@@ -77,6 +77,8 @@ crate `zydra-gui`, CI, README, `LICENSE`, `NOTICE`.
 - 17 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
   `CARGO_BIN_EXE_zydra`: kedua mode serangan, kedua bahasa, `--json`, `--quiet`, dan setiap
   kode keluar
+- 52 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
+  boleh ditekan", dan pengendali yang menjalankan serangan sungguhan sampai selesai
 
 Perintah yang sudah setara dengan `Zydra.py`:
 
@@ -302,13 +304,33 @@ Sisa yang belum dikerjakan, berurutan:
    7-Zip, `rar`, maupun `unrar`, jadi fixture RAR tidak bisa dibuat di sini.
 3. `tester::pdf` — API sudah diverifikasi. Terhalang hal yang sama.
 
-**Plan B — GUI.** `zydra-gui` dengan egui: tema Cyber Industrial, layout Sidebar +
-Workspace yang responsif (breakpoint di 1100 / 720 / 420 px), widget, controller. Kunci
-katalog untuk GUI (sidebar, workspace, settings) belum ditulis; tambahkan bersamaan
-dengan panelnya supaya tidak menulis kata yang nanti berubah.
+**Plan B — GUI.** Selesai untuk irisan pertama: `zydra-gui` dengan egui, tema Cyber
+Industrial, tata letak Sidebar + Workspace yang responsif, pengendali yang menghubungkan
+antarmuka ke mesin, konsol aktivitas, spanduk hasil dengan tombol salin, dan penggantian
+bahasa dari dalam jendela.
+
+Yang belum ada di GUI:
+
+- Panel pengaturan lanjutan (jumlah worker, batas kombinasi, byte verifikasi ZIP).
+- Font Inter dan JetBrains Mono. Sekarang memakai font bawaan egui. Tampilan tetap
+  berjalan, dan menambahkannya hanya perlu memuat berkas font di `fonts.rs`.
+- Panel untuk memilih dan memuat sesi yang tersimpan (menunggu `session` di Plan C).
+- Ekspor log dari antarmuka (menunggu `log` ekspor di Plan C).
 
 **Plan C — fitur lanjutan + rilis.** `session` (resume), `config`, mask, rules, panel
 settings, ekspor log, CI 3 OS, dan rilis otomatis saat tag.
+
+### Jebakan yang sudah terbayar di GUI
+
+- **`rust-version` kembali memilih versi lama.** `cargo add eframe` mengambil 0.32.3
+  padahal yang tersedia 0.36.2. Tetap dipakai 0.32.3 supaya tidak mengejar MSRV lagi.
+  API egui 0.32 sudah diverifikasi langsung dari sumber crate-nya.
+- **`Stroke::new(1.0, ..)` memicu peringatan `float_literal_f32_fallback`** yang akan
+  menjadi kesalahan di rilis Rust berikutnya. Di tema dipakai konstanta `HAIRLINE`;
+  di widget dipakai sufiks `1.0_f32`.
+- **`cargo add <crate>` untuk tes tidak cukup.** Tes integrasi tidak bisa memakai
+  dependensi biasa, jadi `zip`, `tempfile`, dan `crossbeam-channel` juga harus ada di
+  `[dev-dependencies]` pada crate yang mengujinya.
 
 Catatan: `TesterInfo.encryption` dan `CrackFailure` sudah memuat varian untuk RAR dan PDF,
 dan `Backend` sudah punya `Rar` dan `Pdf`. Jadi menambahkan kedua backend itu tidak perlu

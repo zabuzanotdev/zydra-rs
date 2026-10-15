@@ -31,15 +31,15 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | **ZIP** (ZipCrypto dan AES-256) | Berfungsi |
 | **Berkas `shadow` Unix** (md5, sha256, sha512, bcrypt, des) | Berfungsi |
 | Antarmuka baris perintah | Berfungsi |
+| Antarmuka grafis (eframe/egui) | Berfungsi |
 | Dua bahasa (Inggris, Indonesia) | Berfungsi |
 | **RAR** | **Belum ada.** Perintah akan melaporkan bahwa backend-nya tidak tersedia |
 | **PDF** | **Belum ada.** Sama |
-| Antarmuka grafis | Belum ada |
 | Resume serangan panjang | Belum ada |
 | Mask attack dan aturan mangling | Belum ada |
 | Rilis siap unduh | Belum ada |
 
-Pengujian: **191 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
+Pengujian: **248 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
 ---
 
@@ -135,6 +135,26 @@ Dengan `--json`:
 
 ---
 
+## Antarmuka grafis
+
+```bash
+cargo run --release -p zydra-gui
+```
+
+Jendela dengan panel pilihan di kiri dan area kerja di kanan: kemajuan besar,
+statistik kecepatan dan sisa waktu, catatan aktivitas, dan spanduk hasil dengan
+tombol salin password.
+
+Tata letaknya menyesuaikan lebar jendela tanpa ada elemen yang terpotong. Ambangnya
+di 1100, 720, dan 420 piksel: sidebar menyempit dulu, lalu pindah ke atas sebagai
+panel yang bisa dibuka-tutup, kolom statistik berkurang dari tiga jadi satu, dan
+tombol berubah jadi lebar penuh. Semua keputusan itu ada di satu berkas,
+`responsive.rs`, dan diuji tepat di nilai ambangnya.
+
+Bahasa antarmuka bisa diganti dari jendela tanpa memulai ulang aplikasi.
+
+---
+
 ## Arsitektur
 
 Empat crate dalam satu workspace, dengan aturan dependensi satu arah:
@@ -150,7 +170,7 @@ zydra-cli ──┘
 | `zydra-core` | Logika pemulihan. Tidak tahu apa pun soal antarmuka, dan tidak memuat satu pun kalimat yang dilihat pengguna |
 | `zydra-i18n` | Katalog teks (fluent). Satu-satunya tempat kalimat tinggal |
 | `zydra-cli` | Baris perintah |
-| `zydra-gui` | Antarmuka grafis (belum ada) |
+| `zydra-gui` | Antarmuka grafis (eframe/egui) |
 
 Konsekuensi dari pemisahan ini:
 
@@ -223,15 +243,15 @@ worse than one that admits the gap.
 | **ZIP** (ZipCrypto and AES-256) | Works |
 | **Unix `shadow` files** (md5, sha256, sha512, bcrypt, des) | Works |
 | Command-line interface | Works |
+| Graphical interface (eframe/egui) | Works |
 | Two languages (English, Indonesian) | Works |
 | **RAR** | **Not implemented.** Reports that the backend is unavailable |
 | **PDF** | **Not implemented.** Same |
-| Graphical interface | Not started |
 | Resuming long attacks | Not started |
 | Mask attacks and mangling rules | Not started |
 | Downloadable releases | Not started |
 
-Testing: **191 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
+Testing: **248 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
 ## Usage
 
