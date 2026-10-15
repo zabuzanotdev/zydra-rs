@@ -107,6 +107,7 @@ sidebar-target-empty = Belum ada berkas
 sidebar-method = Metode
 sidebar-method-dictionary = Kamus
 sidebar-method-brute-force = Brute force
+sidebar-method-mask = Mask
 sidebar-wordlist = Wordlist
 sidebar-wordlist-empty = Belum ada wordlist
 sidebar-charset = Kelas karakter
@@ -118,6 +119,14 @@ charset-space = Spasi
 sidebar-min-length = Panjang min
 sidebar-max-length = Panjang maks
 sidebar-combinations = Kombinasi
+
+# Mask dan aturan
+sidebar-mask = Pola mask
+sidebar-mask-hint = misalnya ?l?l?l?l?d?d
+sidebar-mask-empty = Isi pola mask
+sidebar-rules = Aturan mangling
+sidebar-rules-enable = Terapkan aturan pada setiap kandidat
+sidebar-rules-hint = misalnya none,capitalize+append-digits:9
 
 # Area kerja
 workspace-status-idle = Siap

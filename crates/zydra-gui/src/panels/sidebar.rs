@@ -62,7 +62,16 @@ pub fn sidebar(
                 wordlist_section(ui, theme, messages, settings, &mut actions, full_width)
             }
             Method::BruteForce => brute_force_section(ui, theme, messages, settings),
+            Method::Mask => mask_section(ui, theme, messages, settings),
         }
+    });
+
+    // Aturan berlaku untuk metode apa pun, jadi bagiannya berdiri sendiri dan tidak
+    // menghilang saat metodenya berganti.
+    ui.add_enabled_ui(editable, |ui| {
+        ui.add_space(theme.gap(3.0));
+        rules_section(ui, theme, messages, settings);
+        plan_problem(ui, theme, messages, settings);
     });
 
     ui.add_space(theme.gap(4.0));
@@ -117,10 +126,36 @@ fn method_section(ui: &mut Ui, theme: &Theme, messages: &Messages, settings: &mu
             Method::BruteForce,
             messages.text("sidebar-method-brute-force"),
         ),
+        (Method::Mask, messages.text("sidebar-method-mask")),
     ];
     if let Some(chosen) = controls::segmented(ui, theme, &options, settings.method) {
         settings.method = chosen;
     }
+}
+
+fn mask_section(ui: &mut Ui, theme: &Theme, messages: &Messages, settings: &mut UiSettings) {
+    widgets::section_label(ui, theme, &messages.text("sidebar-mask"));
+    ui.add_space(theme.gap(1.0));
+    ui.add(
+        egui::TextEdit::singleline(&mut settings.mask)
+            .hint_text(messages.text("sidebar-mask-hint"))
+            .desired_width(f32::INFINITY),
+    );
+}
+
+fn rules_section(ui: &mut Ui, theme: &Theme, messages: &Messages, settings: &mut UiSettings) {
+    ui.checkbox(
+        &mut settings.use_rules,
+        messages.text("sidebar-rules-enable"),
+    );
+    ui.add_enabled_ui(settings.use_rules, |ui| {
+        ui.add_space(theme.gap(1.0));
+        ui.add(
+            egui::TextEdit::singleline(&mut settings.rules)
+                .hint_text(messages.text("sidebar-rules-hint"))
+                .desired_width(f32::INFINITY),
+        );
+    });
 }
 
 fn wordlist_section(
@@ -186,19 +221,26 @@ fn brute_force_section(ui: &mut Ui, theme: &Theme, messages: &Messages, settings
         theme,
         &format!("{}: {estimate}", messages.text("sidebar-combinations")),
     );
+}
 
-    // Rentang yang salah dijelaskan sebelum tombol mulai ditekan, bukan setelah gagal.
-    if let Err(problem) = settings.plan() {
-        let key = match problem {
-            PlanProblem::MissingTarget | PlanProblem::MissingWordlist => None,
-            PlanProblem::NoCharset => Some("error-no-charset"),
-            PlanProblem::BadRange => Some("usage-bad-length"),
-        };
-        if let Some(key) = key {
-            ui.add_space(theme.gap(1.0));
-            ui.colored_label(theme.error, messages.text(key));
-        }
-    }
+/// Menjelaskan kenapa rencananya belum bisa dijalankan.
+///
+/// Dipanggil untuk semua metode, bukan hanya brute force, supaya pilihan yang belum
+/// lengkap dijelaskan sebelum tombol mulai ditekan alih-alih setelah gagal.
+fn plan_problem(ui: &mut Ui, theme: &Theme, messages: &Messages, settings: &UiSettings) {
+    let Err(problem) = settings.plan() else {
+        return;
+    };
+    let key = match problem {
+        // Kekurangan ini sudah terlihat dari panelnya sendiri: berkas yang belum dipilih
+        // tampil sebagai baris kosong. Menambahkan peringatan hanya menambah kebisingan.
+        PlanProblem::MissingTarget | PlanProblem::MissingWordlist => return,
+        PlanProblem::NoCharset => "error-no-charset",
+        PlanProblem::BadRange => "usage-bad-length",
+        PlanProblem::EmptyMask => "sidebar-mask-empty",
+    };
+    ui.add_space(theme.gap(2.0));
+    ui.colored_label(theme.error, messages.text(key));
 }
 
 #[allow(clippy::too_many_arguments)]

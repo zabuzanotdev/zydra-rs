@@ -11,6 +11,8 @@ use zydra_core::attack::AttackPlan;
 use zydra_core::candidate::wordlist::WordlistSource;
 use zydra_core::candidate::CandidateSource;
 use zydra_core::model::charset::CharsetSet;
+use zydra_core::model::mask::MaskPattern;
+use zydra_core::model::rules::RuleSet;
 use zydra_core::model::target::CrackTarget;
 
 /// Metode serangan yang dipilih.
@@ -20,6 +22,8 @@ pub enum Method {
     Dictionary,
     /// Coba setiap kombinasi karakter.
     BruteForce,
+    /// Coba setiap kombinasi yang diizinkan sebuah pola mask.
+    Mask,
 }
 
 /// Kenapa sebuah rencana belum bisa dijalankan.
@@ -33,6 +37,8 @@ pub enum PlanProblem {
     NoCharset,
     /// Rentang panjang tidak masuk akal.
     BadRange,
+    /// Pola mask belum diisi.
+    EmptyMask,
 }
 
 /// Apa yang sudah dipilih pengguna.
@@ -52,6 +58,12 @@ pub struct UiSettings {
     pub min_length: u8,
     /// Panjang maksimum.
     pub max_length: u8,
+    /// Pola mask.
+    pub mask: String,
+    /// Daftar aturan mangling.
+    pub rules: String,
+    /// Apakah aturan mangling diterapkan.
+    pub use_rules: bool,
     /// Apakah panel pilihan sedang terbuka.
     pub sidebar_open: bool,
     /// Waktu terakhir password disalin, untuk menampilkan tanda sebentar saja.
@@ -68,6 +80,9 @@ impl Default for UiSettings {
             charset: CharsetSet::LOWERCASE | CharsetSet::DIGITS,
             min_length: 1,
             max_length: 4,
+            mask: String::new(),
+            rules: String::new(),
+            use_rules: false,
             sidebar_open: true,
             copied_at: None,
         }
@@ -76,14 +91,19 @@ impl Default for UiSettings {
 
 impl UiSettings {
     /// Menyusun rencana serangan, atau menjelaskan kenapa belum bisa.
+    ///
+    /// Aturan mangling membungkus metode apa pun yang dipilih, bukan menjadi metode
+    /// tersendiri. Dengan begitu menyalakan aturan tidak menghilangkan pilihan metode, dan
+    /// pengguna bisa mematikannya kembali tanpa kehilangan apa yang sudah diisi.
     pub fn plan(&self) -> Result<AttackPlan, PlanProblem> {
-        let target = self.target.as_ref().ok_or(PlanProblem::MissingTarget)?;
-        let _ = target;
-        match self.method {
-            Method::Dictionary => {
-                let wordlist = self.wordlist.clone().ok_or(PlanProblem::MissingWordlist)?;
-                Ok(AttackPlan::Dictionary { wordlist })
-            }
+        if self.target.is_none() {
+            return Err(PlanProblem::MissingTarget);
+        }
+
+        let base = match self.method {
+            Method::Dictionary => AttackPlan::Dictionary {
+                wordlist: self.wordlist.clone().ok_or(PlanProblem::MissingWordlist)?,
+            },
             Method::BruteForce => {
                 if self.charset.is_empty() {
                     return Err(PlanProblem::NoCharset);
@@ -91,13 +111,31 @@ impl UiSettings {
                 if self.min_length == 0 || self.max_length < self.min_length {
                     return Err(PlanProblem::BadRange);
                 }
-                Ok(AttackPlan::BruteForce {
+                AttackPlan::BruteForce {
                     charset: self.charset,
                     min_length: self.min_length,
                     max_length: self.max_length,
-                })
+                }
             }
+            Method::Mask => {
+                let pattern = self.mask.trim();
+                if pattern.is_empty() {
+                    return Err(PlanProblem::EmptyMask);
+                }
+                AttackPlan::Mask {
+                    pattern: pattern.to_string(),
+                }
+            }
+        };
+
+        let rules = self.rules.trim();
+        if self.use_rules && !rules.is_empty() {
+            return Ok(AttackPlan::WithRules {
+                base: Box::new(base),
+                rules: rules.to_string(),
+            });
         }
+        Ok(base)
     }
 
     /// Apakah serangan bisa dimulai sekarang.
@@ -111,18 +149,27 @@ impl UiSettings {
     /// dipilih. Membaca ulang seluruh berkas setiap bingkai akan membuat antarmuka
     /// tersendat pada wordlist besar.
     pub fn estimate(&self) -> Option<u64> {
-        match self.method {
-            Method::Dictionary => self.wordlist_lines,
+        let base = match self.method {
+            Method::Dictionary => self.wordlist_lines?,
             Method::BruteForce => {
                 if self.charset.is_empty() || self.max_length < self.min_length {
                     return None;
                 }
-                Some(
-                    self.charset
-                        .total_combinations(self.min_length, self.max_length),
-                )
+                self.charset
+                    .total_combinations(self.min_length, self.max_length)
             }
+            Method::Mask => MaskPattern::parse(self.mask.trim()).ok()?.total(),
+        };
+
+        if self.use_rules {
+            // Pola yang belum selesai diketik akan gagal diurai, dan itu bukan kesalahan
+            // yang perlu ditampilkan saat pengguna masih menulis.
+            let per_word = RuleSet::parse(self.rules.trim())
+                .map(|rules| rules.outputs_per_word())
+                .unwrap_or(1);
+            return Some(base.saturating_mul(per_word));
         }
+        Some(base)
     }
 
     /// Menghitung baris wordlist dan menyimpannya.
@@ -310,5 +357,122 @@ mod tests {
     fn the_default_character_set_is_letters_and_digits() {
         let settings = UiSettings::default();
         assert_eq!(settings.charset, CharsetSet::LOWERCASE | CharsetSet::DIGITS);
+    }
+
+    #[test]
+    fn a_filled_mask_produces_a_mask_plan() {
+        let settings = UiSettings {
+            target: Some(target()),
+            method: Method::Mask,
+            mask: "?l?l?d?d".to_string(),
+            ..UiSettings::default()
+        };
+        match settings.plan().unwrap() {
+            AttackPlan::Mask { pattern } => assert_eq!(pattern, "?l?l?d?d"),
+            other => panic!("unexpected plan: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_empty_mask_is_rejected() {
+        let settings = UiSettings {
+            target: Some(target()),
+            method: Method::Mask,
+            mask: "   ".to_string(),
+            ..UiSettings::default()
+        };
+        assert_eq!(settings.plan().unwrap_err(), PlanProblem::EmptyMask);
+    }
+
+    #[test]
+    fn the_mask_estimate_is_the_product_of_its_positions() {
+        let settings = UiSettings {
+            method: Method::Mask,
+            mask: "?l?d".to_string(),
+            ..UiSettings::default()
+        };
+        assert_eq!(settings.estimate(), Some(26 * 10));
+    }
+
+    #[test]
+    fn a_mask_that_is_still_being_typed_has_no_estimate() {
+        let settings = UiSettings {
+            method: Method::Mask,
+            mask: "?l?".to_string(),
+            ..UiSettings::default()
+        };
+        assert_eq!(settings.estimate(), None);
+    }
+
+    #[test]
+    fn rules_wrap_whichever_method_is_chosen() {
+        let settings = UiSettings {
+            target: Some(target()),
+            method: Method::Mask,
+            mask: "?l?d".to_string(),
+            rules: "capitalize".to_string(),
+            use_rules: true,
+            ..UiSettings::default()
+        };
+        match settings.plan().unwrap() {
+            AttackPlan::WithRules { base, rules } => {
+                assert!(matches!(*base, AttackPlan::Mask { .. }));
+                assert_eq!(rules, "capitalize");
+            }
+            other => panic!("unexpected plan: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn rules_are_ignored_when_they_are_turned_off() {
+        let settings = UiSettings {
+            target: Some(target()),
+            method: Method::Mask,
+            mask: "?d".to_string(),
+            rules: "capitalize".to_string(),
+            use_rules: false,
+            ..UiSettings::default()
+        };
+        assert!(matches!(settings.plan().unwrap(), AttackPlan::Mask { .. }));
+    }
+
+    #[test]
+    fn an_empty_rules_field_changes_nothing_even_when_turned_on() {
+        let settings = UiSettings {
+            target: Some(target()),
+            method: Method::Mask,
+            mask: "?d".to_string(),
+            rules: "  ".to_string(),
+            use_rules: true,
+            ..UiSettings::default()
+        };
+        assert!(matches!(settings.plan().unwrap(), AttackPlan::Mask { .. }));
+    }
+
+    #[test]
+    fn the_estimate_multiplies_by_the_rules() {
+        let settings = UiSettings {
+            method: Method::Mask,
+            mask: "?d".to_string(),
+            rules: "none,append-digits:1".to_string(),
+            use_rules: true,
+            ..UiSettings::default()
+        };
+        // Sepuluh kandidat dasar dikali tiga keluaran per kata.
+        assert_eq!(settings.estimate(), Some(10 * 3));
+    }
+
+    #[test]
+    fn an_incomplete_rules_field_does_not_remove_the_estimate() {
+        // Pengguna yang masih mengetik aturan tidak boleh kehilangan angka perkiraannya,
+        // dan tidak boleh melihat kesalahan yang belum tentu salah.
+        let settings = UiSettings {
+            method: Method::Mask,
+            mask: "?d".to_string(),
+            rules: "capitalize,".to_string(),
+            use_rules: true,
+            ..UiSettings::default()
+        };
+        assert_eq!(settings.estimate(), Some(10));
     }
 }

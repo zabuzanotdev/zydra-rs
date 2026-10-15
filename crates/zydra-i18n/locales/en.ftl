@@ -106,6 +106,7 @@ sidebar-target-empty = No file selected
 sidebar-method = Method
 sidebar-method-dictionary = Dictionary
 sidebar-method-brute-force = Brute force
+sidebar-method-mask = Mask
 sidebar-wordlist = Wordlist
 sidebar-wordlist-empty = No wordlist selected
 sidebar-charset = Character set
@@ -117,6 +118,14 @@ charset-space = Space
 sidebar-min-length = Min length
 sidebar-max-length = Max length
 sidebar-combinations = Combinations
+
+# Mask and rules
+sidebar-mask = Mask pattern
+sidebar-mask-hint = for example ?l?l?l?l?d?d
+sidebar-mask-empty = Enter a mask pattern
+sidebar-rules = Mangling rules
+sidebar-rules-enable = Apply rules to every candidate
+sidebar-rules-hint = for example none,capitalize+append-digits:9
 
 # Workspace
 workspace-status-idle = Ready
