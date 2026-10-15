@@ -56,10 +56,14 @@ pub struct Args {
     /// Plain output.
     #[arg(short = 'q', long = "quiet")]
     pub quiet: bool,
+
+    /// Continue a previous run.
+    #[arg(long = "resume")]
+    pub resume: bool,
 }
 
 /// Pasangan nama argumen dan kunci bantuan yang dipakai.
-const HELP_KEYS: [(&str, &str); 11] = [
+const HELP_KEYS: [(&str, &str); 12] = [
     ("file", "cli-help-file"),
     ("wordlist", "cli-help-wordlist"),
     ("charset", "cli-help-charset"),
@@ -71,6 +75,7 @@ const HELP_KEYS: [(&str, &str); 11] = [
     ("lang", "cli-help-lang"),
     ("json", "cli-help-json"),
     ("quiet", "cli-help-quiet"),
+    ("resume", "cli-help-resume"),
 ];
 
 /// Membangun perintah clap dengan seluruh teks dari katalog terjemahan.

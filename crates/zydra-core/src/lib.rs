@@ -14,4 +14,5 @@ pub mod engine;
 pub mod error;
 pub mod log;
 pub mod model;
+pub mod session;
 pub mod tester;

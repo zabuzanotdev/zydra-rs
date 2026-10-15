@@ -396,6 +396,187 @@ fn version_is_reported() {
     assert!(stdout(&output).contains("zydra"));
 }
 
+/// Menjalankan binary dengan direktori sesi yang ditentukan.
+fn run_with_sessions(arguments: &[&str], session_dir: &std::path::Path) -> Output {
+    Command::new(binary())
+        .args(arguments)
+        .env("ZYDRA_SESSION_DIR", session_dir)
+        .output()
+        .expect("failed to run the zydra binary")
+}
+
+/// Menulis sesi tersimpan untuk sebuah berkas target, seolah serangan sebelumnya terputus.
+fn write_session(
+    session_dir: &std::path::Path,
+    target: &std::path::Path,
+    plan: zydra_core::attack::AttackPlan,
+    position: u64,
+) {
+    use zydra_core::model::target::CrackTarget;
+    use zydra_core::session::store::{
+        FileSessionStore, SessionState, SessionStore, TargetFingerprint,
+    };
+
+    let store = FileSessionStore::new(session_dir);
+    let fingerprint = TargetFingerprint::of(&CrackTarget::from_path(target)).unwrap();
+    store
+        .save(&SessionState::new(fingerprint, plan, position))
+        .unwrap();
+}
+
+#[test]
+fn a_run_can_be_resumed_from_a_saved_position() {
+    let directory = tempfile::tempdir().unwrap();
+    let sessions = directory.path().join("sessions");
+    // Password berada di ujung ruang pencarian, jadi kalau posisinya salah dilanjutkan
+    // hasilnya akan berbeda.
+    let archive = encrypted_archive(directory.path(), "999");
+
+    write_session(
+        &sessions,
+        &archive,
+        zydra_core::attack::AttackPlan::BruteForce {
+            charset: zydra_core::model::charset::CharsetSet::DIGITS,
+            min_length: 3,
+            max_length: 3,
+        },
+        950,
+    );
+
+    let output = run_with_sessions(
+        &[
+            "-f",
+            &archive.to_string_lossy(),
+            "-b",
+            "digits",
+            "-m",
+            "3",
+            "-x",
+            "3",
+            "--resume",
+            "--quiet",
+        ],
+        &sessions,
+    );
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains("999"), "output: {text}");
+    assert!(text.contains("Resuming from"), "output: {text}");
+}
+
+#[test]
+fn resuming_without_a_saved_session_starts_from_the_beginning() {
+    let directory = tempfile::tempdir().unwrap();
+    let sessions = directory.path().join("sessions");
+    let archive = encrypted_archive(directory.path(), "42");
+
+    let output = run_with_sessions(
+        &[
+            "-f",
+            &archive.to_string_lossy(),
+            "-b",
+            "digits",
+            "-m",
+            "1",
+            "-x",
+            "2",
+            "--resume",
+            "--quiet",
+        ],
+        &sessions,
+    );
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("No saved session"));
+}
+
+#[test]
+fn resuming_a_changed_file_is_refused_rather_than_silently_restarted() {
+    let directory = tempfile::tempdir().unwrap();
+    let sessions = directory.path().join("sessions");
+    let archive = encrypted_archive(directory.path(), "42");
+
+    write_session(
+        &sessions,
+        &archive,
+        zydra_core::attack::AttackPlan::BruteForce {
+            charset: zydra_core::model::charset::CharsetSet::DIGITS,
+            min_length: 1,
+            max_length: 2,
+        },
+        5,
+    );
+
+    // Berkas targetnya berubah setelah sesi disimpan.
+    std::fs::write(&archive, b"the file is no longer the same archive").unwrap();
+
+    let output = run_with_sessions(
+        &[
+            "-f",
+            &archive.to_string_lossy(),
+            "-b",
+            "digits",
+            "-m",
+            "1",
+            "-x",
+            "2",
+            "--resume",
+            "--quiet",
+        ],
+        &sessions,
+    );
+
+    assert_eq!(exit_code(&output), 3, "stderr: {}", stderr(&output));
+    assert!(
+        stderr(&output).contains("does not match"),
+        "stderr: {}",
+        stderr(&output)
+    );
+}
+
+#[test]
+fn a_completed_run_leaves_nothing_to_resume() {
+    let directory = tempfile::tempdir().unwrap();
+    let sessions = directory.path().join("sessions");
+    let archive = encrypted_archive(directory.path(), "42");
+
+    let first = run_with_sessions(
+        &[
+            "-f",
+            &archive.to_string_lossy(),
+            "-b",
+            "digits",
+            "-m",
+            "1",
+            "-x",
+            "2",
+            "--quiet",
+        ],
+        &sessions,
+    );
+    assert_eq!(exit_code(&first), 0);
+
+    // Sesi dibersihkan setelah serangan selesai, jadi percobaan berikutnya yang meminta
+    // lanjut akan memulai dari awal alih-alih melanjutkan dari posisi yang sudah selesai.
+    let second = run_with_sessions(
+        &[
+            "-f",
+            &archive.to_string_lossy(),
+            "-b",
+            "digits",
+            "-m",
+            "1",
+            "-x",
+            "2",
+            "--resume",
+            "--quiet",
+        ],
+        &sessions,
+    );
+    assert!(stdout(&second).contains("No saved session"));
+}
+
 #[test]
 fn a_mask_search_finds_the_password() {
     let directory = tempfile::tempdir().unwrap();

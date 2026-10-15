@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 /// Jenis berkas yang bisa dicoba.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum TargetKind {
     /// Arsip ZIP.
     Zip,

@@ -11,14 +11,19 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use zydra_core::attack::{AttackLimits, AttackPlan};
+use zydra_core::constants::SESSION_SAVE_INTERVAL_SECS;
 use zydra_core::engine::cancel::CancelToken;
 use zydra_core::engine::crack::{run, EngineConfig, EngineEvent};
+use zydra_core::log::{LogEntry, LogLevel};
 use zydra_core::model::charset::CharsetSet;
 use zydra_core::model::failure::{Backend, CrackFailure};
 use zydra_core::model::target::CrackTarget;
+use zydra_core::session::store::{
+    FileSessionStore, SessionLookup, SessionState, SessionStore, TargetFingerprint,
+};
 use zydra_core::tester::factory::DefaultTesterFactory;
 use zydra_core::tester::TesterFactory;
-use zydra_i18n::{Locale, Messages};
+use zydra_i18n::{format, Locale, Messages};
 
 use crate::cli::Args;
 use crate::render::Reporter;
@@ -170,13 +175,59 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
 
     let target = CrackTarget::from_path(args.file.clone().expect("validated above"));
 
-    let prepared = match plan.prepare(&AttackLimits::default()) {
+    let mut prepared = match plan.prepare(&AttackLimits::default()) {
         Ok(prepared) => prepared,
         Err(failure) => {
             reporter.failure(&failure);
             return exit_code_for(&failure);
         }
     };
+
+    let sessions = Sessions::open(&target);
+    let mut start_position = 0;
+
+    if args.resume {
+        match sessions.lookup() {
+            Some(Ok(SessionLookup::Found(state))) => {
+                start_position = state.position.min(prepared.total);
+                reporter.log(
+                    &LogEntry::now(LogLevel::Info, "log-session-resumed")
+                        .with_arg("position", format::count(start_position))
+                        .with_arg("total", format::count(prepared.total)),
+                );
+            }
+            Some(Ok(SessionLookup::Absent)) => {
+                reporter.log(&LogEntry::now(LogLevel::Info, "log-session-absent"));
+            }
+            // Berkasnya sudah berubah, jadi posisi lama tidak lagi berarti. Melanjutkan
+            // akan melewati kandidat yang seharusnya dicoba, dan memulai diam-diam dari
+            // awal akan membuat pengguna mengira serangannya dilanjutkan.
+            Some(Ok(SessionLookup::Mismatch)) => {
+                let failure = CrackFailure::SessionFingerprintMismatch;
+                if reporter.is_json() {
+                    reporter.json_line(&[
+                        ("kind", json::string("failed")),
+                        ("code", json::string(failure_code(&failure))),
+                    ]);
+                }
+                reporter.failure(&failure);
+                return exit_code_for(&failure);
+            }
+            // Sesi rusak atau tidak bisa dibaca. Serangan tetap berjalan dari awal, dan
+            // sebabnya masuk ke catatan alih-alih menghentikan pekerjaan.
+            Some(Err(error)) => {
+                reporter.log(
+                    &LogEntry::now(LogLevel::Warn, "error-unknown")
+                        .with_arg("detail", error.to_string()),
+                );
+            }
+            None => {}
+        }
+    }
+
+    if start_position > 0 {
+        prepared.source.skip(start_position);
+    }
 
     let method_label = messages.text(method_key(&plan));
     let method_value = match &plan {
@@ -202,6 +253,12 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
     let events = run(prepared.source, factory, target, config, cancel);
     let bar = reporter.progress_bar(total);
 
+    // Posisi awal disimpan juga, supaya serangan yang dihentikan sangat awal tetap punya
+    // titik lanjut.
+    sessions.save(&plan, start_position);
+    let save_interval = Duration::from_secs(SESSION_SAVE_INTERVAL_SECS);
+    let mut last_save = Instant::now();
+
     let mut outcome = Outcome::Unknown;
     while let Ok(event) = events.recv() {
         match event {
@@ -225,6 +282,10 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
                         ("total", data.total.to_string()),
                         ("speed", data.speed_per_second.to_string()),
                     ]);
+                }
+                if last_save.elapsed() >= save_interval {
+                    sessions.save(&plan, absolute_position(start_position, data.tried, total));
+                    last_save = Instant::now();
                 }
             }
             EngineEvent::Found { password, detail } => {
@@ -253,6 +314,8 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
 
     match outcome {
         Outcome::Found { password, detail } => {
+            // Serangan selesai sepenuhnya, jadi tidak ada yang perlu dilanjutkan.
+            sessions.clear();
             if reporter.is_json() {
                 let mut fields = vec![
                     ("kind", json::string("found")),
@@ -270,6 +333,7 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
             EXIT_FOUND
         }
         Outcome::Exhausted => {
+            sessions.clear();
             if reporter.is_json() {
                 reporter.json_line(&[
                     ("kind", json::string("exhausted")),
@@ -310,6 +374,74 @@ fn execute(args: &Args, reporter: &Reporter) -> u8 {
     }
 }
 
+/// Sesi tersimpan untuk satu berkas target.
+///
+/// Kalau direktori data pengguna tidak bisa ditentukan, seluruh kemampuan melanjutkan
+/// dimatikan dan serangan tetap berjalan. Kehilangan fitur ini tidak boleh membuat alatnya
+/// tidak bisa dipakai sama sekali.
+struct Sessions {
+    store: Option<FileSessionStore>,
+    fingerprint: Option<TargetFingerprint>,
+}
+
+impl Sessions {
+    fn open(target: &CrackTarget) -> Sessions {
+        Sessions {
+            store: session_store(),
+            fingerprint: TargetFingerprint::of(target).ok(),
+        }
+    }
+
+    fn lookup(&self) -> Option<Result<SessionLookup, zydra_core::error::CoreError>> {
+        let store = self.store.as_ref()?;
+        let fingerprint = self.fingerprint.as_ref()?;
+        Some(store.load(fingerprint))
+    }
+
+    /// Menyimpan posisi. Kegagalan menyimpan tidak pernah menghentikan serangan.
+    fn save(&self, plan: &AttackPlan, position: u64) {
+        let (Some(store), Some(fingerprint)) = (self.store.as_ref(), self.fingerprint.as_ref())
+        else {
+            return;
+        };
+        let state = SessionState::new(fingerprint.clone(), plan.clone(), position);
+        let _ = store.save(&state);
+    }
+
+    /// Menghapus sesi setelah serangan selesai sepenuhnya.
+    fn clear(&self) {
+        let (Some(store), Some(fingerprint)) = (self.store.as_ref(), self.fingerprint.as_ref())
+        else {
+            return;
+        };
+        let _ = store.clear(fingerprint);
+    }
+}
+
+/// Posisi absolut dari sebuah kemajuan.
+///
+/// Mesin menghitung kandidat yang dicoba sejak ia dijalankan, bukan sejak awal ruang
+/// pencarian. Setelah serangan dilanjutkan dari posisi tertentu, angka itu harus
+/// ditambahkan ke titik awalnya. Tanpa itu posisi yang tersimpan akan mundur setiap kali
+/// serangan dilanjutkan lalu dihentikan lagi, dan kemajuannya hilang sedikit demi sedikit.
+fn absolute_position(start: u64, tried: u64, total: u64) -> u64 {
+    start.saturating_add(tried).min(total)
+}
+
+/// Memilih tempat penyimpanan sesi.
+///
+/// `ZYDRA_SESSION_DIR` menimpanya. Itu berguna untuk pemasangan portabel, untuk memisahkan
+/// pekerjaan satu sama lain, dan untuk pengujian, yang tidak mungkin menulis ke direktori
+/// data pengguna sungguhan.
+fn session_store() -> Option<FileSessionStore> {
+    if let Ok(directory) = std::env::var("ZYDRA_SESSION_DIR") {
+        if !directory.trim().is_empty() {
+            return Some(FileSessionStore::new(directory));
+        }
+    }
+    FileSessionStore::in_user_data_dir().ok()
+}
+
 /// Hasil akhir satu kali jalan.
 enum Outcome {
     Found {
@@ -344,7 +476,8 @@ fn exit_code_for(failure: &CrackFailure) -> u8 {
     match failure {
         CrackFailure::FileUnreadable { .. }
         | CrackFailure::BackendUnavailable { .. }
-        | CrackFailure::UnsupportedFormat { .. } => EXIT_TARGET,
+        | CrackFailure::UnsupportedFormat { .. }
+        | CrackFailure::SessionFingerprintMismatch => EXIT_TARGET,
         CrackFailure::PasswordNotFound | CrackFailure::NoCandidate => EXIT_NOT_FOUND,
         _ => EXIT_USAGE,
     }
@@ -396,6 +529,7 @@ mod tests {
             lang: None,
             json: false,
             quiet: false,
+            resume: false,
         }
     }
 
@@ -643,5 +777,22 @@ mod tests {
     fn a_known_language_selects_its_catalogue() {
         let args = ["zydra", "--lang", "id"].map(String::from);
         assert_eq!(resolve_messages(&args).unwrap().locale(), Locale::Id);
+    }
+
+    #[test]
+    fn a_resumed_position_is_the_start_plus_what_this_run_tried() {
+        // Regresi: tanpa penambahan ini, melanjutkan lalu menghentikan lagi akan menulis
+        // posisi yang lebih kecil daripada yang dibaca, dan kemajuannya hilang.
+        assert_eq!(absolute_position(8_302, 100, 1_000_000), 8_402);
+    }
+
+    #[test]
+    fn the_absolute_position_never_passes_the_total() {
+        assert_eq!(absolute_position(90, 100, 100), 100);
+    }
+
+    #[test]
+    fn the_absolute_position_does_not_overflow() {
+        assert_eq!(absolute_position(u64::MAX - 1, 10, u64::MAX), u64::MAX);
     }
 }

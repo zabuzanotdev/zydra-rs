@@ -17,6 +17,7 @@ zydra-i18n = { version = "0.1.0", path = "../zydra-i18n" }
 [dev-dependencies]
 tempfile.workspace = true
 zip.workspace = true
+zydra-core = { version = "0.1.0", path = "../zydra-core" }
 
 # Nama binary sengaja dipisah dari nama paket supaya yang dipasang pengguna bernama
 # `zydra`, dan supaya tes integrasi bisa menemukannya lewat CARGO_BIN_EXE_zydra.

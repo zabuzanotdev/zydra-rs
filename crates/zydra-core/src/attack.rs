@@ -42,7 +42,7 @@ impl Default for AttackLimits {
 /// uraian. Dengan begitu rencana tetap menjadi gambaran jujur dari masukan pengguna, semua
 /// kesalahan penguraian muncul di satu tempat dengan sebab yang tepat, dan rencana bisa
 /// disimpan lalu dimuat kembali tanpa kehilangan apa pun.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum AttackPlan {
     /// Coba setiap baris sebuah wordlist.
     Dictionary {

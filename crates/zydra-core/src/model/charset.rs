@@ -112,6 +112,57 @@ impl CharsetSet {
         }
         Ok(set)
     }
+
+    /// Menuliskan himpunan ini kembali sebagai daftar nama kelas.
+    ///
+    /// Kebalikan dari [`CharsetSet::parse`], dalam urutan tetap yang sama dengan
+    /// [`CharsetSet::alphabet`]. Dipakai untuk menampilkan pilihan pengguna dan untuk
+    /// menyimpannya ke berkas sesi.
+    pub fn to_spec(self) -> String {
+        let mut names: Vec<&str> = Vec::new();
+        if self.contains(CharsetSet::LOWERCASE) {
+            names.push("lowercase");
+        }
+        if self.contains(CharsetSet::UPPERCASE) {
+            names.push("uppercase");
+        }
+        if self.contains(CharsetSet::DIGITS) {
+            names.push("digits");
+        }
+        if self.contains(CharsetSet::SYMBOLS) {
+            names.push("symbols");
+        }
+        if self.contains(CharsetSet::SPACE) {
+            names.push("space");
+        }
+        names.join(",")
+    }
+}
+
+/// Serialisasi memakai bentuk teks yang sama dengan baris perintah.
+///
+/// Bentuk ini dipilih karena bisa dibaca manusia dan sudah stabil: berkas sesi yang
+/// menyimpan `"digits,lowercase"` masih bisa dipahami orang, dan bentuknya tidak berubah
+/// kalau representasi bit di dalam berubah.
+impl serde::Serialize for CharsetSet {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&self.to_spec())
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for CharsetSet {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<CharsetSet, D::Error> {
+        use serde::de::Error as _;
+
+        let spec = String::deserialize(deserializer)?;
+        // Himpunan kosong ditulis sebagai teks kosong, dan `parse` menolaknya karena pada
+        // baris perintah himpunan kosong memang kesalahan pengguna. Di sini teks kosong
+        // harus diterima supaya hasil serialisasinya bisa dibaca kembali.
+        if spec.trim().is_empty() {
+            return Ok(CharsetSet::empty());
+        }
+        CharsetSet::parse(&spec).map_err(D::Error::custom)
+    }
 }
 
 #[cfg(test)]
@@ -203,5 +254,67 @@ mod tests {
     fn parse_rejects_an_empty_specification() {
         assert!(CharsetSet::parse("").is_err());
         assert!(CharsetSet::parse(",,,").is_err());
+    }
+
+    #[test]
+    fn to_spec_lists_the_classes_in_a_fixed_order() {
+        let set = CharsetSet::DIGITS | CharsetSet::LOWERCASE;
+        assert_eq!(set.to_spec(), "lowercase,digits");
+    }
+
+    #[test]
+    fn every_subset_survives_a_round_trip_through_text() {
+        // Sifat ini yang membuat berkas sesi bisa dibaca kembali dengan benar. Kalau ada
+        // satu himpunan yang tidak bolak-balik dengan utuh, sesinya akan dilanjutkan
+        // dengan kelas karakter yang berbeda dari yang dipilih pengguna.
+        let classes = [
+            CharsetSet::LOWERCASE,
+            CharsetSet::UPPERCASE,
+            CharsetSet::DIGITS,
+            CharsetSet::SYMBOLS,
+            CharsetSet::SPACE,
+        ];
+        for mask in 0u8..32 {
+            let mut set = CharsetSet::empty();
+            for (index, class) in classes.iter().enumerate() {
+                if mask & (1 << index) != 0 {
+                    set |= *class;
+                }
+            }
+            let spec = set.to_spec();
+            if set.is_empty() {
+                assert_eq!(spec, "");
+                continue;
+            }
+            assert_eq!(CharsetSet::parse(&spec).unwrap(), set, "spec was {spec:?}");
+        }
+    }
+
+    #[test]
+    fn an_empty_set_is_written_as_an_empty_string() {
+        assert_eq!(CharsetSet::empty().to_spec(), "");
+    }
+
+    #[test]
+    fn a_charset_serialises_as_readable_text() {
+        let set = CharsetSet::LOWERCASE | CharsetSet::DIGITS;
+        let encoded = serde_json::to_string(&set).unwrap();
+        assert_eq!(encoded, "\"lowercase,digits\"");
+        let decoded: CharsetSet = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, set);
+    }
+
+    #[test]
+    fn an_empty_charset_survives_serialisation_even_though_parsing_it_is_an_error() {
+        let encoded = serde_json::to_string(&CharsetSet::empty()).unwrap();
+        assert_eq!(encoded, "\"\"");
+        let decoded: CharsetSet = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(decoded, CharsetSet::empty());
+    }
+
+    #[test]
+    fn an_unknown_class_in_a_serialised_charset_is_an_error() {
+        let result: Result<CharsetSet, _> = serde_json::from_str("\"lowercase,nope\"");
+        assert!(result.is_err());
     }
 }
