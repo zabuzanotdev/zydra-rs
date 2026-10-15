@@ -429,7 +429,7 @@ max_brute_length: u8    (default 6)
 batch_size: usize       (default 64)
 progress_interval_ms: u64 (default 350)
 rar_mode: "auto" | "rar4" | "rar5"
-zip_verify_bytes: usize (default 4096)
+zip_max_entry_bytes: usize (default 67_108_864)
 log_keep_entries: usize (default 5000)
 ```
 
@@ -486,10 +486,16 @@ bocor ke antarmuka pengguna.
 
 | Format | Crate | Cara verifikasi | Perbaikan atas versi Python |
 |---|---|---|---|
-| ZIP | `zip` (fitur AES) | Buka arsip dengan kandidat password, baca hingga `zip_verify_bytes` dari entri terenkripsi pertama ke buffer, lalu buang | Python memanggil `extractall` ke disk dan membuat `temp_directory` berisi salinan arsip. Rust tidak menulis berkas sama sekali |
-| RAR | `unrar` (libunrar dibundel) | Buka dengan kandidat, baca potongan entri pertama | Python hanya RAR4 dan bergantung paket `rarfile` |
-| PDF | `lopdf` | Muat dokumen dengan kandidat password; berhasil dimuat berarti cocok | Python **menjalankan binary `qpdf`** yang harus dipasang lebih dulu. Rust murni |
-| shadow | `pwhash` | Hitung hash kandidat dengan garam dari berkas, bandingkan dengan hash tersimpan | Python memakai modul `crypt` yang hanya ada di Unix; di Windows fitur ini mati total. Rust jalan di ketiganya |
+| ZIP | `zip` (fitur `aes-crypto`) | Buka arsip dengan `ZipArchive::by_index_decrypt`, lalu **baca entri pertama sampai habis**. AES-256 punya verifikasi HMAC sehingga pasti; ZipCrypto hanya memvalidasi 1 dari 256 bit, jadi password salah bisa lolos di header dan hanya ketahuan dari CRC32 di akhir entri. Bacaan dibatasi `zip_max_entry_bytes`; kalau batas tercapai, kandidat tetap dilaporkan cocok tetapi `detail` menyatakan verifikasinya terpotong | Python memanggil `extractall` ke disk dan membuat `temp_directory` berisi salinan arsip. Rust tidak menulis berkas sama sekali |
+| RAR | `unrar` (libunrar dibundel) | `Archive::with_password(path, pw)`, lalu `open_for_processing()`, `read_header()`, dan `read()` entri pertama. Password salah menghasilkan `Err` | Python hanya RAR4 dan bergantung paket `rarfile` |
+| PDF | `lopdf` | `Document::load_with_password(path, pw)`, lalu pastikan `!was_encrypted()` atau `encryption_state.is_some()`, dan halaman bisa diakses | Python **menjalankan binary `qpdf`** yang harus dipasang lebih dulu. Rust murni |
+| shadow | `pwhash` | `pwhash::unix::verify(password, hash)` — mengenali sendiri format modular (`$1$`, `$5$`, `$6$`, `$2y$`) | Python memakai modul `crypt` yang hanya ada di Unix; di Windows fitur ini mati total. Rust jalan di ketiganya |
+
+Catatan penting soal ZIP: `by_index_decrypt` pada crate `zip` secara eksplisit memperingatkan bahwa
+fungsi itu "sometimes accepts wrong password" karena ZipCrypto hanya menyediakan 1 dari 256 bit untuk
+validasi. Karena itu verifikasi **wajib** membaca entri sampai habis dan bersandar pada CRC32, bukan
+pada keberhasilan pembukaan header. Ini juga alasan `zip_verify_bytes` dihapus dari konfigurasi:
+memeriksa beberapa kilobyte pertama tidak membuktikan apa pun untuk ZipCrypto.
 
 Untuk PDF, berkas hasil dekripsi tidak ditulis otomatis. Setelah password ditemukan, pengguna menekan
 tombol simpan dan memilih lokasi; baru dokumen ditulis ke sana. Ini menghindari efek samping tersembunyi.
