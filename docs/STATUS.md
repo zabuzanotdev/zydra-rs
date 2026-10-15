@@ -20,16 +20,16 @@ Yang **sudah selesai dan terverifikasi**:
 |---|---|---|
 | Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 11 kali |
 | Plan A1 | `docs/superpowers/plans/2026-10-15-zydra-core-engine.md` | 9 tugas, selesai semua |
-| `zydra-core` | `crates/zydra-core/` | Selesai untuk ZIP dan shadow, termasuk mask dan aturan mangling |
+| `zydra-core` | `crates/zydra-core/` | Selesai: keempat format, mask, dan aturan mangling |
 | `zydra-i18n` | `crates/zydra-i18n/` | Selesai, locale en + id |
-| `zydra-cli` | `crates/zydra-cli/` | Selesai, menggantikan `Zydra.py` untuk ZIP dan shadow |
+| `zydra-cli` | `crates/zydra-cli/` | Selesai, menggantikan `Zydra.py` untuk keempat format |
 | `zydra-gui` | `crates/zydra-gui/` | Selesai untuk tata letak Sidebar + Workspace yang responsif |
 | Backend ZIP | `src/tester/zip.rs` | Selesai, teruji end-to-end |
+| Backend RAR | `src/tester/rar.rs` | Selesai, RAR4 dan RAR5, teruji end-to-end |
+| Backend PDF | `src/tester/pdf.rs` | Selesai, teruji end-to-end |
 | Backend shadow | `src/tester/shadow.rs` | Selesai, teruji |
-| Backend RAR | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
-| Backend PDF | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
 
-Total **340 tes** lintas workspace, fmt bersih, clippy bersih.
+Total **370 tes** lintas workspace, fmt bersih, clippy bersih.
 
 Isi `zydra-core` yang sudah ada:
 
@@ -68,16 +68,15 @@ crate `zydra-gui`, CI, README, `LICENSE`, `NOTICE`.
 
 `cargo test --workspace` menjalankan 191 tes:
 
-- 119 tes unit `zydra-core`
-- 4 tes end-to-end `zydra-core` yang membuat arsip ZIP AES-256 sendiri lalu
-  memecahkannya lewat jalur lengkap `AttackPlan` → `DefaultTesterFactory` → `ZipTester`
-  → `engine::run`
-- 23 tes `zydra-i18n`
+- 213 tes unit `zydra-core`
+- 11 tes end-to-end `zydra-core` untuk keempat format: ZIP, PDF, RAR4, dan RAR5, masing-masing
+  dengan kasus password ditemukan dan tidak ditemukan, plus brute force dan mask
+- 28 tes `zydra-i18n`
 - 34 tes unit `zydra-cli`
-- 24 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
-  `CARGO_BIN_EXE_zydra`: kedua mode serangan, mask, aturan mangling, kedua bahasa,
-  `--json`, `--quiet`, dan setiap kode keluar
-- 52 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
+- 26 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
+  `CARGO_BIN_EXE_zydra`: keempat format, mask, aturan mangling, kedua bahasa, `--json`,
+  `--quiet`, dan setiap kode keluar
+- 58 tes `zydra-gui`: logika responsif tepat di nilai ambang, aturan "kapan tombol mulai
   boleh ditekan", dan pengendali yang menjalankan serangan sungguhan sampai selesai
 
 Perintah yang sudah setara dengan `Zydra.py`:
@@ -336,8 +335,22 @@ Belum dikerjakan:
   berubah.
 - Ekspor log.
 
-Mask dan aturan mangling sudah selesai di core dan di CLI. GUI belum bisa memakainya
+Keempat format sudah selesai di core dan di CLI. GUI belum bisa memakai mask dan aturan
 karena panelnya belum ada; mesinnya sudah siap dan tidak perlu diubah lagi.
+
+### Batasan yang diketahui, dan sebabnya
+
+- **RAR: hanya entri terenkripsi pertama yang diuji.** `read` pada crate `unrar` memakan
+  arsipnya, jadi setelah pembacaan gagal tidak ada cara melanjutkan ke entri berikutnya
+  tanpa membuka ulang seluruh arsip. Pada arsip nyata seluruh entri memakai password yang
+  sama, sehingga entri pertama sudah mewakili.
+- **Berkas dengan tanda tangan RAR yang valid tetapi isinya rusak** akan dijalankan
+  sebagai arsip biasa dan berakhir "password tidak ditemukan", bukan kesalahan berkas.
+  Pemeriksaan tanda tangan menangkap berkas yang jelas bukan RAR, tetapi tidak menangkap
+  arsip yang rusak di tengah.
+- **Target yang tidak terenkripsi** akan melaporkan kandidat pertama sebagai cocok, karena
+  membuka berkas tanpa enkripsi berhasil dengan password apa pun. `TesterInfo::encryption`
+  sudah menyimpan keadaan ini, jadi antarmuka bisa memperingatkan; belum dikerjakan.
 
 ### Cara memeriksa CI
 

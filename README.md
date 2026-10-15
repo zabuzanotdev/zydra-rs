@@ -32,16 +32,17 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | **Mask attack** (`?l?l?d?d`) | Berfungsi |
 | **Aturan mangling** (`capitalize+append-digits:9`) | Berfungsi |
 | **ZIP** (ZipCrypto dan AES-256) | Berfungsi |
+| **RAR** (RAR4 dan RAR5) | Berfungsi |
+| **PDF** (standard security handler) | Berfungsi |
 | **Berkas `shadow` Unix** (md5, sha256, sha512, bcrypt, des) | Berfungsi |
 | Antarmuka baris perintah | Berfungsi |
 | Antarmuka grafis (eframe/egui) | Berfungsi |
 | Dua bahasa (Inggris, Indonesia) | Berfungsi |
-| **RAR** | **Belum ada.** Perintah akan melaporkan bahwa backend-nya tidak tersedia |
-| **PDF** | **Belum ada.** Sama |
 | Resume serangan panjang | Belum ada |
+| Ekspor log | Belum ada |
 | Rilis siap unduh | Belum ada |
 
-Pengujian: **340 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
+Pengujian: **370 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
 ---
 
@@ -287,16 +288,17 @@ worse than one that admits the gap.
 | **Mask attack** (`?l?l?d?d`) | Works |
 | **Mangling rules** (`capitalize+append-digits:9`) | Works |
 | **ZIP** (ZipCrypto and AES-256) | Works |
+| **RAR** (RAR4 and RAR5) | Works |
+| **PDF** (standard security handler) | Works |
 | **Unix `shadow` files** (md5, sha256, sha512, bcrypt, des) | Works |
 | Command-line interface | Works |
 | Graphical interface (eframe/egui) | Works |
 | Two languages (English, Indonesian) | Works |
-| **RAR** | **Not implemented.** Reports that the backend is unavailable |
-| **PDF** | **Not implemented.** Same |
 | Resuming long attacks | Not started |
+| Log export | Not started |
 | Downloadable releases | Not started |
 
-Testing: **340 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
+Testing: **370 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
 ## Usage
 
