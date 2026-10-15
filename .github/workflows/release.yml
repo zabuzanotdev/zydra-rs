@@ -1,0 +1,115 @@
+name: Rilis
+
+on:
+  push:
+    tags: ["v*"]
+
+# Diperlukan untuk membuat rilis dan mengunggah berkas ke dalamnya.
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  bangun:
+    name: Bangun (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pasang dependensi Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libssl-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Build
+        run: cargo build --release --workspace --target ${{ matrix.target }}
+
+      # Paket rilis memuat binary, dokumen lisensi, dan README. Menyertakan lisensi di
+      # dalam paket bukan kesopanan: GPL mewajibkannya, dan pengguna yang mengunduh satu
+      # berkas saja tidak punya cara lain mendapatkannya.
+      - name: Kemas
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="${{ matrix.target }}"
+          nama="zydra-${target}"
+          mkdir -p "dist/${nama}"
+
+          ext=""
+          if [ "${target}" = "x86_64-pc-windows-msvc" ]; then
+            ext=".exe"
+          fi
+
+          cp "target/${target}/release/zydra${ext}" "dist/${nama}/"
+          cp "target/${target}/release/zydra-gui${ext}" "dist/${nama}/"
+          cp LICENSE LICENSE-MIT-Zydra.txt NOTICE README.md "dist/${nama}/"
+
+          cd dist
+          if [ "${ext}" = ".exe" ]; then
+            # Runner Windows punya bsdtar, tetapi Compress-Archive lebih pasti
+            # menghasilkan arsip zip yang bisa dibuka Windows Explorer.
+            powershell -NoProfile -Command "Compress-Archive -Path '${nama}' -DestinationPath '${nama}.zip'"
+          else
+            tar czf "${nama}.tar.gz" "${nama}"
+          fi
+          ls -l
+
+      - name: Simpan paket
+        uses: actions/upload-artifact@v4
+        with:
+          name: zydra-${{ matrix.target }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  rilis:
+    name: Terbitkan
+    needs: bangun
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Daftar paket
+        run: ls -l dist
+
+      - name: Buat rilis
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          draft: false

@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      # Satu sistem yang gagal tidak boleh menyembunyikan hasil dua sistem lainnya.
+      # Kalau macOS gagal, kita tetap ingin tahu Windows dan Linux lolos atau tidak.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Dependensi sistem untuk jendela di Linux. rfd memakai xdg-portal dan wayland,
+      # bukan GTK, jadi yang dibutuhkan libwayland-dev dan bukan libgtk-3-dev.
+      # eframe/winit membutuhkan xkbcommon dan pustaka X11.
+      - name: Pasang dependensi Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libxcb-render0-dev \
+            libxcb-shape0-dev \
+            libxcb-xfixes0-dev \
+            libssl-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Tes
+        run: cargo test --workspace
+
+      - name: Build rilis
+        run: cargo build --workspace --release
+
+  aturan-dependensi:
+    name: Aturan dependensi
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+
+      # Aturan ini adalah alasan utama proyek ini tetap modular. Tanpa pemeriksaan
+      # otomatis, satu `cargo add egui` yang salah tempat akan merusaknya tanpa ada
+      # yang menyadari sampai terlalu banyak kode sudah bergantung padanya.
+      - name: zydra-core tidak boleh memuat crate antarmuka
+        run: |
+          tree="$(cargo tree -p zydra-core --edges normal --prefix none)"
+          echo "$tree"
+          pelanggaran="$(echo "$tree" | grep -E '^(egui|eframe|epaint|clap|indicatif|rfd|arboard|owo-colors|winit|accesskit|wgpu|glow) v' || true)"
+          if [ -n "$pelanggaran" ]; then
+            echo "::error::zydra-core menarik crate antarmuka:"
+            echo "$pelanggaran"
+            exit 1
+          fi
+          echo "pohon dependensi zydra-core bersih"
+
+      # Kalimat yang dilihat pengguna harus hidup di katalog terjemahan. Core tidak boleh
+      # mencetak apa pun sendiri.
+      - name: zydra-core tidak boleh mencetak ke terminal
+        run: |
+          if grep -rnE 'println!|eprintln!|print!|eprint!' crates/zydra-core/src; then
+            echo "::error::zydra-core mencetak ke terminal; pakai zydra-i18n"
+            exit 1
+          fi
+          echo "zydra-core tidak mencetak apa pun"
+
+      # Kesalahan masukan pengguna memakai CrackFailure, kesalahan prasarana memakai
+      # CoreError. `exit` di dalam core berarti core memutuskan nasib proses, dan itu
+      # wewenang antarmuka.
+      - name: zydra-core tidak boleh mengakhiri proses
+        run: |
+          if grep -rnE 'std::process::exit|process::abort' crates/zydra-core/src; then
+            echo "::error::zydra-core mengakhiri proses sendiri"
+            exit 1
+          fi
+          echo "zydra-core tidak mengakhiri proses"
