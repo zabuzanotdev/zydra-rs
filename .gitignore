@@ -1,0 +1,22 @@
+# Build artifacts
+/target/
+**/target/
+*.pdb
+*.ilk
+
+# Sesi brainstorming (mockup, state server)
+.superpowers/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Sementara
+*.tmp
+*.bak

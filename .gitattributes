@@ -1,0 +1,14 @@
+# Normalisasi akhir baris lintas platform: simpan LF di repositori.
+# Tanpa ini, checkout di Windows mengubah CRLF dan diff jadi berisik.
+* text=auto eol=lf
+
+# Berkas biner jangan disentuh
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
+*.gz binary
+*.pdf binary
+*.rar binary
+*.ttf binary
+*.otf binary
