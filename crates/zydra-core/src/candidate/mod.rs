@@ -1,5 +1,6 @@
 //! Sumber kandidat password. Mesin tidak peduli dari mana kandidat berasal.
 
+pub mod bruteforce;
 pub mod wordlist;
 
 /// Deretan kandidat password.
