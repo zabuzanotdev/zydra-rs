@@ -4,9 +4,10 @@
 //! mahal seperti membaca header arsip terjadi di sini, bukan di dalam loop kandidat.
 
 use crate::constants::DEFAULT_ZIP_MAX_ENTRY_BYTES;
-use crate::model::failure::{Backend, CrackFailure};
+use crate::model::failure::CrackFailure;
 use crate::model::target::{CrackTarget, TargetKind};
 use crate::tester::pdf::PdfTester;
+use crate::tester::rar::RarTester;
 use crate::tester::shadow::ShadowTester;
 use crate::tester::zip::ZipTester;
 use crate::tester::{PasswordTester, TesterFactory};
@@ -47,12 +48,7 @@ impl TesterFactory for DefaultTesterFactory {
             )?)),
             TargetKind::Shadow => Ok(Box::new(ShadowTester::open(&target.path)?)),
             TargetKind::Pdf => Ok(Box::new(PdfTester::open(&target.path)?)),
-            // Backend RAR belum ada di build ini. Sebabnya dinyatakan apa adanya supaya
-            // antarmuka bisa menampilkan pesan yang benar, bukan pesan umum.
-            TargetKind::Rar => Err(CrackFailure::BackendUnavailable {
-                backend: Backend::Rar,
-                reason: "backend-not-built".to_string(),
-            }),
+            TargetKind::Rar => Ok(Box::new(RarTester::open(&target.path)?)),
             TargetKind::Unsupported => Err(CrackFailure::UnsupportedFormat {
                 display_name: target.display_name.clone(),
             }),
@@ -63,6 +59,7 @@ impl TesterFactory for DefaultTesterFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::failure::Backend;
     use crate::tester::EncryptionKind;
     use std::io::Write;
     use zip::write::SimpleFileOptions;
@@ -109,19 +106,29 @@ mod tests {
     }
 
     #[test]
-    fn rar_reports_that_its_backend_is_missing() {
-        let factory = DefaultTesterFactory::new();
-        let target = CrackTarget {
-            kind: TargetKind::Rar,
-            path: "whatever".into(),
-            display_name: "whatever".to_string(),
-        };
-        match factory.create(&target) {
+    fn a_rar_target_produces_a_rar_tester() {
+        let fixture = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/rar4_solid_encrypted.rar"
+        );
+        let target = CrackTarget::from_path(fixture);
+        let tester = DefaultTesterFactory::new().create(&target).unwrap();
+        assert_eq!(tester.info().kind, TargetKind::Rar);
+        assert_eq!(tester.info().encryption, EncryptionKind::RarCrypto4);
+    }
+
+    #[test]
+    fn a_rar_file_that_is_not_an_archive_is_reported_as_unavailable() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("fake.rar");
+        std::fs::write(&path, b"not really a rar archive").unwrap();
+        let target = CrackTarget::from_path(&path);
+        match DefaultTesterFactory::new().create(&target) {
             Err(CrackFailure::BackendUnavailable { backend, .. }) => {
                 assert_eq!(backend, Backend::Rar)
             }
             Err(other) => panic!("unexpected failure: {other:?}"),
-            Ok(_) => panic!("expected a failure for RAR"),
+            Ok(_) => panic!("expected a failure for a non-RAR file"),
         }
     }
 

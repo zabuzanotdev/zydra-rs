@@ -5,6 +5,7 @@
 
 pub mod factory;
 pub mod pdf;
+pub mod rar;
 pub mod shadow;
 pub mod zip;
 

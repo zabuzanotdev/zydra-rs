@@ -15,6 +15,7 @@ lopdf = "0.42.0"
 num_cpus.workspace = true
 pwhash.workspace = true
 thiserror.workspace = true
+unrar = "0.5.8"
 zip.workspace = true
 
 [dev-dependencies]

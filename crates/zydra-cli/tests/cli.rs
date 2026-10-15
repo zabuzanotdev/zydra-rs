@@ -208,15 +208,15 @@ fn a_missing_archive_is_a_target_error() {
 }
 
 #[test]
-fn the_rar_backend_reports_that_it_is_missing() {
+fn a_file_that_is_not_a_rar_archive_is_a_target_error() {
     let directory = tempfile::tempdir().unwrap();
     let rar = directory.path().join("vault.rar");
-    std::fs::write(&rar, b"Rar!\x1a\x07\x00not really a rar").unwrap();
+    std::fs::write(&rar, b"a rar extension without a rar signature").unwrap();
     let words = wordlist(directory.path(), &["a"]);
 
     let output = run(&["-f", &rar.to_string_lossy(), "-d", &words.to_string_lossy()]);
 
-    assert_eq!(exit_code(&output), 3);
+    assert_eq!(exit_code(&output), 3, "stderr: {}", stderr(&output));
     assert!(
         stderr(&output).contains("RAR"),
         "stderr: {}",
@@ -254,7 +254,7 @@ fn json_output_is_machine_readable() {
 fn json_output_reports_a_failure_with_a_stable_code() {
     let directory = tempfile::tempdir().unwrap();
     let rar = directory.path().join("vault.rar");
-    std::fs::write(&rar, b"Rar!\x1a\x07\x00nope").unwrap();
+    std::fs::write(&rar, b"not a rar archive at all").unwrap();
     let words = wordlist(directory.path(), &["a"]);
 
     let output = run(&[
@@ -338,6 +338,55 @@ fn an_unknown_language_is_rejected() {
     let output = run(&["--lang", "fr", "-f", "vault.zip", "-d", "words.txt"]);
     assert_eq!(exit_code(&output), 2);
     assert!(stderr(&output).contains("fr"));
+}
+
+#[test]
+fn a_rar_archive_is_cracked_from_the_command_line() {
+    // Fixture ini milik crate zydra-core; tes ini menjalankan binary yang sesungguhnya
+    // terhadap berkas yang sama, supaya backend RAR terbukti lewat jalur pengguna.
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("zydra-core")
+        .join("tests")
+        .join("fixtures")
+        .join("rar4_solid_encrypted.rar");
+    let directory = tempfile::tempdir().unwrap();
+    let words = wordlist(directory.path(), &["letmein", "123456", "password"]);
+
+    let output = run(&[
+        "-f",
+        &fixture.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+        "--quiet",
+    ]);
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    let text = stdout(&output);
+    assert!(text.contains("password"), "output: {text}");
+}
+
+#[test]
+fn a_pdf_archive_is_cracked_from_the_command_line() {
+    let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("zydra-core")
+        .join("tests")
+        .join("fixtures")
+        .join("encrypted.pdf");
+    let directory = tempfile::tempdir().unwrap();
+    let words = wordlist(directory.path(), &["letmein", "kr4k3n_1987"]);
+
+    let output = run(&[
+        "-f",
+        &fixture.to_string_lossy(),
+        "-d",
+        &words.to_string_lossy(),
+        "--quiet",
+    ]);
+
+    assert_eq!(exit_code(&output), 0, "stderr: {}", stderr(&output));
+    assert!(stdout(&output).contains("kr4k3n_1987"));
 }
 
 #[test]
