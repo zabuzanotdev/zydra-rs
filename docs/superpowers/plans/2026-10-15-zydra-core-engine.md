@@ -1099,8 +1099,15 @@ pub mod wordlist;
 ///
 /// Implementasi harus bisa dipindahkan ke thread lain. Urutan kandidat harus stabil
 /// supaya [`CandidateSource::skip`] bisa dipakai untuk melanjutkan serangan.
+///
+/// **Kontrak kehabisan yang wajib dipenuhi:** setelah [`CandidateSource::next_candidate`]
+/// mengembalikan `None`, setiap pemanggilan berikutnya harus tetap mengembalikan `None`.
+/// Sumber yang memulai ulang dari awal setelah habis akan membuat mesin paralel menelusuri
+/// ruang yang sama tanpa henti, karena worker lain masih menarik kandidat setelah worker
+/// pertama menemui ujungnya.
 pub trait CandidateSource: Send {
-    /// Kandidat berikutnya, atau `None` kalau sudah habis.
+    /// Kandidat berikutnya, atau `None` kalau sudah habis. Setelah `None`, selamanya
+    /// `None`.
     fn next_candidate(&mut self) -> Option<String>;
 
     /// Jumlah kandidat yang akan dihasilkan. Boleh menjenuh pada `u64::MAX`.
@@ -1363,6 +1370,45 @@ mod tests {
     }
 
     #[test]
+    fn exhaustion_is_permanent() {
+        // Regresi: advance() sempat me-reset odometer ke nol saat ruang habis, sehingga
+        // panggilan berikutnya justru memulai ulang dari awal. Dengan dua worker di
+        // engine, satu worker berhenti di ujung sementara worker lain menarik kandidat
+        // lagi, dan penelusuran berputar tanpa henti.
+        let mut brute = source(1, 2);
+        assert_eq!(drain(&mut brute).len(), 6);
+        for _ in 0..5 {
+            assert_eq!(brute.next_candidate(), None);
+        }
+    }
+
+    #[test]
+    fn draining_twice_yields_nothing_the_second_time() {
+        let mut brute = source(1, 3);
+        assert_eq!(drain(&mut brute).len(), 2 + 4 + 8);
+        assert!(drain(&mut brute).is_empty());
+    }
+
+    #[test]
+    fn skipping_to_the_exact_end_leaves_nothing_behind() {
+        let mut brute = source(1, 2);
+        brute.skip(brute.total());
+        assert_eq!(brute.position(), 6);
+        for _ in 0..3 {
+            assert_eq!(brute.next_candidate(), None);
+        }
+    }
+
+    #[test]
+    fn skipping_zero_after_exhaustion_stays_exhausted() {
+        let mut brute = source(1, 2);
+        brute.skip(6);
+        assert_eq!(brute.next_candidate(), None);
+        brute.skip(0);
+        assert_eq!(brute.next_candidate(), None);
+    }
+
+    #[test]
     fn skipping_zero_changes_nothing() {
         let mut brute = source(1, 2);
         brute.skip(0);
@@ -1419,6 +1465,7 @@ pub struct BruteForceSource {
     indices: Vec<usize>,
     current_length: u8,
     started: bool,
+    done: bool,
     emitted: u64,
     total: u64,
 }
@@ -1478,6 +1525,7 @@ impl BruteForceSource {
             indices: Vec::new(),
             current_length: min_length,
             started: false,
+            done: false,
             emitted: 0,
             total,
         })
@@ -1516,6 +1564,7 @@ impl BruteForceSource {
     fn seek(&mut self, index: u64) {
         if index == 0 {
             self.started = false;
+            self.done = false;
             self.emitted = 0;
             self.indices.clear();
             self.current_length = self.min_length;
@@ -1523,6 +1572,14 @@ impl BruteForceSource {
         }
         let base = self.alphabet.len() as u64;
         let target = index.min(self.total);
+        // Melompat tepat ke ujung ruang berarti tidak ada kandidat tersisa.
+        if target >= self.total {
+            self.done = true;
+            self.started = true;
+            self.emitted = self.total;
+            self.indices.clear();
+            return;
+        }
         let mut remaining = target - 1;
         let mut length = self.min_length;
         loop {
@@ -1539,6 +1596,7 @@ impl BruteForceSource {
                 self.current_length = length;
                 self.indices = digits;
                 self.started = true;
+                self.done = false;
                 self.emitted = target;
                 return;
             }
@@ -1550,8 +1608,12 @@ impl BruteForceSource {
 
 impl CandidateSource for BruteForceSource {
     fn next_candidate(&mut self) -> Option<String> {
+        if self.done {
+            return None;
+        }
         if self.started {
             if !self.advance() {
+                self.done = true;
                 return None;
             }
         } else {
@@ -1591,7 +1653,7 @@ Tambahkan `pub mod bruteforce;` ke `crates/zydra-core/src/candidate/mod.rs`.
 - [ ] **Step 4: Jalankan tes untuk memastikan lolos**
 
 Run: `cargo test -p zydra-core bruteforce`
-Expected: `test result: ok. 13 passed`.
+Expected: `test result: ok. 17 passed`.
 
 - [ ] **Step 5: Commit**
 
@@ -2231,22 +2293,17 @@ mod tests {
 
     fn collect(receiver: Receiver<EngineEvent>) -> Vec<EngineEvent> {
         let mut events = Vec::new();
-        loop {
-            match receiver.recv_timeout(Duration::from_secs(10)) {
-                Ok(event) => {
-                    let terminal = matches!(
-                        event,
-                        EngineEvent::Found { .. }
-                            | EngineEvent::Exhausted
-                            | EngineEvent::Cancelled
-                            | EngineEvent::Failed(_)
-                    );
-                    events.push(event);
-                    if terminal {
-                        break;
-                    }
-                }
-                Err(_) => break,
+        while let Ok(event) = receiver.recv_timeout(Duration::from_secs(10)) {
+            let terminal = matches!(
+                event,
+                EngineEvent::Found { .. }
+                    | EngineEvent::Exhausted
+                    | EngineEvent::Cancelled
+                    | EngineEvent::Failed(_)
+            );
+            events.push(event);
+            if terminal {
+                break;
             }
         }
         events
