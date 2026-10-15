@@ -1,0 +1,18 @@
+[package]
+name = "zydra-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+description = "Logika pemulihan password untuk arsip terenkripsi. Tanpa dependensi UI."
+
+[dependencies]
+bitflags.workspace = true
+crossbeam-channel.workspace = true
+num_cpus.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

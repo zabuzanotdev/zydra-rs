@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = ["crates/zydra-core"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/zabuzanotdev/zydra-rs"
+authors = ["zabuzanotdev"]
+
+[workspace.dependencies]
+bitflags = "2"
+crossbeam-channel = "0.5"
+num_cpus = "1"
+thiserror = "1"
+tempfile = "3"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
