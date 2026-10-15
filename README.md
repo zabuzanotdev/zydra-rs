@@ -42,7 +42,7 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | Ekspor log | Belum ada |
 | Rilis siap unduh | Belum ada |
 
-Pengujian: **396 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
+Pengujian: **414 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
 ---
 
@@ -320,7 +320,7 @@ worse than one that admits the gap.
 | Log export | Not started |
 | Downloadable releases | Not started |
 
-Testing: **396 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
+Testing: **414 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
 ## Usage
 
