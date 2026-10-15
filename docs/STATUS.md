@@ -18,9 +18,13 @@ Yang **sudah selesai dan terverifikasi**:
 
 | Lapisan | Berkas | Status |
 |---|---|---|
-| Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 7 kali |
+| Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 9 kali |
 | Plan A1 | `docs/superpowers/plans/2026-10-15-zydra-core-engine.md` | 9 tugas, selesai semua |
-| `zydra-core` | `crates/zydra-core/` | 74 tes, fmt bersih, clippy bersih |
+| `zydra-core` | `crates/zydra-core/` | 123 tes, fmt bersih, clippy bersih |
+| Backend ZIP | `src/tester/zip.rs` | Selesai, teruji end-to-end |
+| Backend shadow | `src/tester/shadow.rs` | Selesai, teruji |
+| Backend RAR | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
+| Backend PDF | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
 
 Isi `zydra-core` yang sudah ada:
 
@@ -29,6 +33,8 @@ src/
 ├── lib.rs            deklarasi modul
 ├── constants.rs      semua angka ajaib
 ├── error.rs          CoreError (kesalahan prasarana)
+├── attack.rs         AttackPlan, AttackLimits, PreparedAttack
+├── log.rs            LogLevel, LogEntry, LogBuffer (cincin berbatas)
 ├── model/
 │   ├── charset.rs    CharsetSet (bitflag), alphabet, total_combinations, parse
 │   ├── target.rs     TargetKind, CrackTarget, deteksi jenis berkas
@@ -39,16 +45,28 @@ src/
 │   ├── wordlist.rs   WordlistSource
 │   └── bruteforce.rs BruteForceSource
 ├── tester/
-│   └── mod.rs        trait PasswordTester, TesterFactory, TesterInfo, MatchOutcome
+│   ├── mod.rs        trait PasswordTester, TesterFactory, TesterInfo, MatchOutcome
+│   ├── factory.rs    DefaultTesterFactory
+│   ├── zip.rs        ZipTester (ZipCrypto + AES-256)
+│   └── shadow.rs     ShadowTester (md5/sha256/sha512/bcrypt/des)
 └── engine/
     ├── cancel.rs     CancelToken
     ├── stats.rs      SpeedMeter (rata-rata bergerak)
     └── crack.rs      EngineConfig, EngineEvent, run()
 ```
 
-Yang **belum ada sama sekali**: `attack`, `log`, tester konkret (zip/rar/pdf/shadow),
-`factory`, crate `zydra-i18n`, crate `zydra-cli`, crate `zydra-gui`, CI, README,
-`LICENSE`, `NOTICE`.
+Yang **belum ada sama sekali**: `tester/rar.rs`, `tester/pdf.rs`, `model/mask.rs`,
+`model/rules.rs`, `candidate/mask.rs`, `candidate/rules.rs`, `session`, `config`,
+crate `zydra-i18n`, crate `zydra-cli`, crate `zydra-gui`, CI, README, `LICENSE`,
+`NOTICE`.
+
+### Kemampuan yang sudah bisa dibuktikan sekarang
+
+`cargo test --workspace` menjalankan 123 tes, termasuk empat tes end-to-end di
+`crates/zydra-core/tests/zip_end_to_end.rs` yang membuat arsip ZIP berenkripsi AES-256
+sendiri lalu memecahkannya lewat jalur lengkap: `AttackPlan` → `DefaultTesterFactory` →
+`ZipTester` → `engine::run`. Itu mencakup mode wordlist, mode brute force, kasus password
+tidak ditemukan, dan kasus target tidak didukung.
 
 ## 2. Cara menjalankan
 
@@ -86,6 +104,16 @@ cargo clippy --all-targets -- -D warnings   # harus bersih
    sama sekali (bukan gagal, hanya diam) sampai timeout. Kalau sebuah perintah cargo
    "menggantung" tanpa keluaran, periksa dulu
    `Get-Process -Name cargo,rustc` sebelum menyimpulkan ada deadlock di kode.
+
+6. **`rust-version` yang terlalu rendah diam-diam menurunkan versi dependensi.**
+   `rust-version = "1.75"` membuat `cargo add zip` memilih zip 4.6.1 alih-alih 9.0.3,
+   sehingga API yang sudah diverifikasi dari dokumentasi versi terbaru tidak berlaku lagi.
+   Nilai sekarang `1.85`, disamakan di `Cargo.toml` dan `clippy.toml`. Kalau menambah
+   dependensi baru dan versinya terasa aneh, periksa dua hal ini lebih dulu.
+
+7. **Mesin ini tidak punya tool arsip/PDF pihak ketiga.** Tidak ada `7z`, `7za`, `7zr`,
+   `rar`, `unrar`, maupun `qpdf`. Konsekuensinya langsung: fixture RAR dan PDF terenkripsi
+   tidak bisa dibuat di sini. Lihat bagian 7.
 
 ## 4. Pelajaran dari Plan A1
 
@@ -188,30 +216,48 @@ lewat fixture tes, bukan diasumsikan.
 
 Urutan yang direncanakan. Setiap rencana menghasilkan software yang bisa dipakai sendiri.
 
-**Plan A2 — menyelesaikan `zydra-core`.** Perkiraan 7 tugas:
+**Plan A2 — menyelesaikan `zydra-core`.**
 
-1. `attack` — `AttackPlan` (Dictionary | BruteForce), `AttackLimits`, `validate`,
-   `total`, `build_source`. Ini sambungan bersama yang dipakai CLI dan GUI supaya
-   validasi tidak ditulis dua kali.
-2. `log` — `LogLevel`, `LogEntry` (menyimpan key i18n + argumen, bukan kalimat jadi),
-   `LogBuffer` berupa cincin berbatas.
-3. `tester::zip` + tes integrasi (tes membuat arsip terenkripsi sendiri, ZipCrypto dan
-   AES-256, lalu memecahkannya — tidak perlu berkas biner di repositori).
-4. `tester::shadow` + tes (berkas shadow sintetis dengan hash yang dihitung `pwhash`).
-5. `tester::rar` + tes (fixture 7-Zip, atau `#[ignore]` dengan alasan jujur).
-6. `tester::pdf` + fixture kecil terenkripsi yang di-commit.
-7. `tester::factory` + tes end-to-end lewat `engine::run` pada berkas ZIP nyata.
+Sudah selesai (dikerjakan langsung, bukan lewat subagent, karena sesi subagent terbukti
+bermasalah di repo ini):
+
+1. `attack` — `AttackPlan`, `AttackLimits`, `PreparedAttack::prepare`. Satu tempat yang
+   menerjemahkan pilihan pengguna menjadi sumber kandidat, supaya CLI dan GUI tidak
+   menulis aturan validasi dua kali.
+2. `log` — `LogLevel`, `LogEntry` (kunci i18n + argumen), `LogBuffer` cincin berbatas.
+3. `tester::zip` — ZipCrypto dan AES-256, membaca entri sampai habis.
+4. `tester::shadow` — lewat `pwhash::unix::verify`.
+5. `tester::factory` — Zip dan Shadow tersambung; Rar dan Pdf mengembalikan
+   `BackendUnavailable` dengan sebab `backend-not-built`.
+6. Tes end-to-end `tests/zip_end_to_end.rs` — membuat arsip terenkripsi sendiri lalu
+   memecahkannya lewat jalur lengkap.
+
+Sisa Plan A2:
+
+7. `tester::rar` — API sudah diverifikasi (lihat bagian 6). **Terhalang**: mesin ini tidak
+   punya 7-Zip, `rar`, maupun `unrar`, jadi fixture RAR tidak bisa dibuat di sini. Pilihan:
+   unduh satu fixture RAR terenkripsi kecil dari sumber publik lalu commit, atau tandai
+   tesnya `#[ignore]` dengan alasan jujur dan nyatakan di README bahwa RAR belum tercakup
+   tes otomatis.
+8. `tester::pdf` — API sudah diverifikasi. **Terhalang hal yang sama**: tidak ada `qpdf`
+   dan `lopdf` tidak bisa menulis PDF terenkripsi, jadi fixture PDF terenkripsi kecil harus
+   dibuat sekali di tempat lain lalu di-commit. Semantik `load_with_password` untuk password
+   salah harus dipastikan lewat fixture itu, jangan diasumsikan.
 
 **Plan A3 — frontend terminal.** `zydra-i18n` (fluent, locale `en` + `id`, disematkan
 dengan `include_str!`) dan `zydra-cli` (clap, `indicatif`, kode keluar 0/1/2/3, `--json`),
 plus README, `LICENSE` GPL-3.0, dan `NOTICE`. Setelah A3, CLI sudah menggantikan
-`Zydra.py` untuk semua format.
+`Zydra.py` untuk format yang backend-nya sudah ada.
 
 **Plan B — GUI.** `zydra-gui` dengan egui: tema Cyber Industrial, layout Sidebar +
 Workspace yang responsif (breakpoint di 1100 / 720 / 420 px), widget, controller.
 
 **Plan C — fitur lanjutan + rilis.** `session` (resume), `config`, mask, rules, panel
 settings, ekspor log, CI 3 OS, dan rilis otomatis saat tag.
+
+Catatan: `TesterInfo.encryption` dan `CrackFailure` sudah memuat varian untuk RAR dan PDF,
+dan `Backend` sudah punya `Rar` dan `Pdf`. Jadi menambahkan kedua backend itu tidak perlu
+mengubah tipe yang sudah ada.
 
 ## 8. Aturan yang tidak boleh dilanggar
 

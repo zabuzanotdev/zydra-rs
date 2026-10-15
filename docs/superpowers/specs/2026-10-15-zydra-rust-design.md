@@ -74,7 +74,6 @@ di pohon dependensinya, build gagal.
 ```
 zydra-rs/
 ├── Cargo.toml                       # [workspace] — daftar anggota saja
-├── rust-toolchain.toml              # channel stable + komponen fmt, clippy
 ├── rustfmt.toml
 ├── clippy.toml
 ├── .gitignore
@@ -92,6 +91,8 @@ zydra-rs/
     │       ├── lib.rs               # re-export publik; tanpa logika
     │       ├── constants.rs         # semua angka ajaib
     │       ├── error.rs             # CoreError
+    │       ├── attack.rs            # AttackPlan, AttackLimits, PreparedAttack
+    │       ├── log.rs               # LogLevel, LogEntry, LogBuffer
     │       ├── model/
     │       │   ├── mod.rs
     │       │   ├── target.rs        # CrackTarget, TargetKind, deteksi jenis
@@ -109,10 +110,10 @@ zydra-rs/
     │       ├── tester/
     │       │   ├── mod.rs           # trait PasswordTester, TesterFactory, TesterInfo
     │       │   ├── factory.rs       # DefaultTesterFactory
-    │       │   ├── zip.rs
-    │       │   ├── rar.rs
-    │       │   ├── pdf.rs
-    │       │   └── shadow.rs
+    │       │   ├── zip.rs           # selesai
+    │       │   ├── shadow.rs        # selesai
+    │       │   ├── rar.rs           # belum ada
+    │       │   └── pdf.rs           # belum ada
     │       ├── engine/
     │       │   ├── mod.rs
     │       │   ├── crack.rs         # orkestrasi worker
