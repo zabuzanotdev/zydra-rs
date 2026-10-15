@@ -23,6 +23,7 @@ serangan tidak menyentuh mesin.
 - Semua angka ajaib hidup di `crates/zydra-core/src/constants.rs`.
 - Akhir baris LF di repositori (sudah diatur `.gitattributes`).
 - `cargo fmt --check` dan `cargo clippy --all-targets -- -D warnings` harus bersih di setiap akhir tugas.
+- Kode di dalam rencana ini ilustratif, bukan hasil `rustfmt`. Beberapa barisnya melewati 100 kolom, jadi **jalankan `cargo fmt` lebih dulu**, baru `cargo fmt --check`. Perbedaan antara keduanya bukan kesalahan.
 - Kesalahan masukan pengguna memakai `CrackFailure`. Kesalahan prasarana memakai `CoreError`. Tidak ada tumpang tindih.
 
 ## File Structure
@@ -1410,6 +1411,7 @@ use crate::model::failure::CrackFailure;
 
 /// Menghasilkan setiap kombinasi dari sebuah alfabet untuk panjang `min_length` sampai
 /// `max_length`, tanpa menyimpan seluruh ruang ke memori.
+#[derive(Debug)]
 pub struct BruteForceSource {
     alphabet: Vec<char>,
     min_length: u8,
@@ -1502,7 +1504,15 @@ impl BruteForceSource {
         }
     }
 
-    /// Menempatkan odometer langsung pada kandidat ke-`index`.
+    /// Menempatkan odometer tepat **sebelum** kandidat ke-`index`, sehingga panggilan
+    /// `next_candidate` berikutnya menghasilkan kandidat ke-`index`.
+    ///
+    /// `next_candidate` selalu memajukan odometer lebih dulu, jadi menempatkannya
+    /// *pada* `index` akan menghasilkan kandidat `index + 1`. Karena itu posisinya
+    /// adalah pendahulu `index - 1`.
+    ///
+    /// `index` dijepit ke `total` supaya melompat melewati akhir ruang menghasilkan
+    /// `None` pada panggilan berikutnya, bukan panik.
     fn seek(&mut self, index: u64) {
         if index == 0 {
             self.started = false;
@@ -1512,7 +1522,8 @@ impl BruteForceSource {
             return;
         }
         let base = self.alphabet.len() as u64;
-        let mut remaining = index;
+        let target = index.min(self.total);
+        let mut remaining = target - 1;
         let mut length = self.min_length;
         loop {
             let block = base.saturating_pow(length as u32);
@@ -1528,7 +1539,7 @@ impl BruteForceSource {
                 self.current_length = length;
                 self.indices = digits;
                 self.started = true;
-                self.emitted = index;
+                self.emitted = target;
                 return;
             }
             remaining -= block;
