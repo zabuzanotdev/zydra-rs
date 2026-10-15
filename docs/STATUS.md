@@ -18,13 +18,18 @@ Yang **sudah selesai dan terverifikasi**:
 
 | Lapisan | Berkas | Status |
 |---|---|---|
-| Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 9 kali |
+| Spec desain | `docs/superpowers/specs/2026-10-15-zydra-rust-design.md` | Disetujui, dikoreksi 10 kali |
 | Plan A1 | `docs/superpowers/plans/2026-10-15-zydra-core-engine.md` | 9 tugas, selesai semua |
-| `zydra-core` | `crates/zydra-core/` | 123 tes, fmt bersih, clippy bersih |
+| `zydra-core` | `crates/zydra-core/` | Selesai untuk ZIP dan shadow |
+| `zydra-i18n` | `crates/zydra-i18n/` | Selesai, locale en + id |
+| `zydra-cli` | `crates/zydra-cli/` | Selesai, menggantikan `Zydra.py` untuk ZIP dan shadow |
 | Backend ZIP | `src/tester/zip.rs` | Selesai, teruji end-to-end |
 | Backend shadow | `src/tester/shadow.rs` | Selesai, teruji |
 | Backend RAR | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
 | Backend PDF | — | **Belum ada.** Factory mengembalikan `BackendUnavailable` |
+| GUI | — | **Belum ada** |
+
+Total **191 tes** lintas workspace, fmt bersih, clippy bersih.
 
 Isi `zydra-core` yang sudah ada:
 
@@ -57,16 +62,40 @@ src/
 
 Yang **belum ada sama sekali**: `tester/rar.rs`, `tester/pdf.rs`, `model/mask.rs`,
 `model/rules.rs`, `candidate/mask.rs`, `candidate/rules.rs`, `session`, `config`,
-crate `zydra-i18n`, crate `zydra-cli`, crate `zydra-gui`, CI, README, `LICENSE`,
-`NOTICE`.
+crate `zydra-gui`, CI, README, `LICENSE`, `NOTICE`.
 
 ### Kemampuan yang sudah bisa dibuktikan sekarang
 
-`cargo test --workspace` menjalankan 123 tes, termasuk empat tes end-to-end di
-`crates/zydra-core/tests/zip_end_to_end.rs` yang membuat arsip ZIP berenkripsi AES-256
-sendiri lalu memecahkannya lewat jalur lengkap: `AttackPlan` → `DefaultTesterFactory` →
-`ZipTester` → `engine::run`. Itu mencakup mode wordlist, mode brute force, kasus password
-tidak ditemukan, dan kasus target tidak didukung.
+`cargo test --workspace` menjalankan 191 tes:
+
+- 119 tes unit `zydra-core`
+- 4 tes end-to-end `zydra-core` yang membuat arsip ZIP AES-256 sendiri lalu
+  memecahkannya lewat jalur lengkap `AttackPlan` → `DefaultTesterFactory` → `ZipTester`
+  → `engine::run`
+- 23 tes `zydra-i18n`
+- 28 tes unit `zydra-cli`
+- 17 tes integrasi `zydra-cli` yang menjalankan **binary yang sesungguhnya** lewat
+  `CARGO_BIN_EXE_zydra`: kedua mode serangan, kedua bahasa, `--json`, `--quiet`, dan setiap
+  kode keluar
+
+Perintah yang sudah setara dengan `Zydra.py`:
+
+```powershell
+# wordlist
+.\target\debug\zydra.exe -f vault.zip -d words.txt
+
+# brute force
+.\target\debug\zydra.exe -f vault.zip -b letters,digits -m 1 -x 4
+
+# shadow Unix
+.\target\debug\zydra.exe -f shadow -d words.txt
+
+# bahasa Indonesia, keluaran terstruktur
+.\target\debug\zydra.exe -f vault.zip -d words.txt --lang id --json
+```
+
+Kode keluar: `0` ditemukan, `1` tidak ditemukan, `2` argumen salah, `3` berkas atau backend
+bermasalah. Versi Python selalu memakai `exit(0)` sehingga tidak bisa dipakai di skrip.
 
 ## 2. Cara menjalankan
 
@@ -114,6 +143,23 @@ cargo clippy --all-targets -- -D warnings   # harus bersih
 7. **Mesin ini tidak punya tool arsip/PDF pihak ketiga.** Tidak ada `7z`, `7za`, `7zr`,
    `rar`, `unrar`, maupun `qpdf`. Konsekuensinya langsung: fixture RAR dan PDF terenkripsi
    tidak bisa dibuat di sini. Lihat bagian 7.
+
+### Jebakan pustaka yang sudah terbayar
+
+- **clap**: arg bantuan dan versi bawaan (`-h`, `-V`) baru ada **setelah**
+  `Command::build()` dipanggil. Memanggil `mut_arg("help", ..)` sebelum itu panik dengan
+  "Argument `help` is undefined". `build()` menerima `&mut self` dan mengembalikan `()`.
+- **clap**: bahasa harus diketahui sebelum perintah dibangun, karena teks bantuan disusun
+  saat itu. Karena itu `--lang` disisir dari argumen mentah lebih dulu.
+- **clap**: kata bawaan "Usage:", "Options:", "Print help", "Print version" semuanya
+  terlihat pengguna. Harus diambil alih lewat `help_template` dan `mut_arg`.
+- **owo-colors**: `if_supports_color` dan `Stream` butuh fitur `supports-colors`. Dan
+  merangkai dua gaya (`text.bold().green()`) tidak bisa dikompilasi karena meminjam nilai
+  antara yang dibuat di dalam closure. Satu gaya per panggilan.
+- **fluent-bundle**: `set_use_isolating(false)` wajib dipanggil. Tanpa itu nilai sisipan
+  dibungkus tanda isolasi Unicode yang tidak terlihat di terminal tetapi ikut tersalin.
+- **`zip`**: `FileOptions::default()` tidak bisa menyimpulkan tipe ekstensinya; pakai alias
+  `SimpleFileOptions`.
 
 ## 4. Pelajaran dari Plan A1
 
@@ -244,13 +290,22 @@ Sisa Plan A2:
    dibuat sekali di tempat lain lalu di-commit. Semantik `load_with_password` untuk password
    salah harus dipastikan lewat fixture itu, jangan diasumsikan.
 
-**Plan A3 — frontend terminal.** `zydra-i18n` (fluent, locale `en` + `id`, disematkan
-dengan `include_str!`) dan `zydra-cli` (clap, `indicatif`, kode keluar 0/1/2/3, `--json`),
-plus README, `LICENSE` GPL-3.0, dan `NOTICE`. Setelah A3, CLI sudah menggantikan
-`Zydra.py` untuk format yang backend-nya sudah ada.
+**Plan A3 — frontend terminal.** Selesai. `zydra-i18n` (fluent, locale `en` + `id`,
+disematkan dengan `include_str!`) dan `zydra-cli` (clap, `indicatif`, `owo-colors`, kode
+keluar 0/1/2/3, `--json`, `--quiet`).
+
+Sisa yang belum dikerjakan, berurutan:
+
+1. **README, `LICENSE` GPL-3.0, `NOTICE`.** Belum ada sama sekali. `NOTICE` wajib memuat
+   atribusi MIT `hamedA2/Zydra` dan catatan lisensi UnRAR sebelum rilis pertama.
+2. `tester::rar` — API sudah diverifikasi (bagian 6). **Terhalang**: mesin ini tidak punya
+   7-Zip, `rar`, maupun `unrar`, jadi fixture RAR tidak bisa dibuat di sini.
+3. `tester::pdf` — API sudah diverifikasi. Terhalang hal yang sama.
 
 **Plan B — GUI.** `zydra-gui` dengan egui: tema Cyber Industrial, layout Sidebar +
-Workspace yang responsif (breakpoint di 1100 / 720 / 420 px), widget, controller.
+Workspace yang responsif (breakpoint di 1100 / 720 / 420 px), widget, controller. Kunci
+katalog untuk GUI (sidebar, workspace, settings) belum ditulis; tambahkan bersamaan
+dengan panelnya supaya tidak menulis kata yang nanti berubah.
 
 **Plan C — fitur lanjutan + rilis.** `session` (resume), `config`, mask, rules, panel
 settings, ekspor log, CI 3 OS, dan rilis otomatis saat tag.
