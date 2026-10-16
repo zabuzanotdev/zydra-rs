@@ -1,6 +1,6 @@
 //! Sumber kandidat yang menerapkan aturan mangling pada sumber lain.
 //!
-//! Sumber ini membungkus sumber dasar apa pun — wordlist, brute force, atau mask — dan
+//! Sumber ini membungkus sumber dasar apa pun - wordlist, brute force, atau mask - dan
 //! mengeluarkan variasi dari setiap kandidat dasarnya. Karena aturan menghasilkan jumlah
 //! keluaran yang tetap untuk setiap kata, posisi dalam ruang gabungan bisa dihitung
 //! langsung: posisi ke-N selalu jatuh pada kata dasar ke-`N / keluaran_per_kata` dengan

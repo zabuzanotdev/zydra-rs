@@ -208,24 +208,50 @@ fn brute_force_section(ui: &mut Ui, theme: &Theme, messages: &Messages, settings
         }
     });
 
-    ui.add_space(theme.gap(3.0));
-    ui.horizontal(|ui| {
-        ui.label(messages.text("sidebar-min-length"));
-        ui.add(egui::DragValue::new(&mut settings.min_length).range(1..=32));
-        ui.label(messages.text("sidebar-max-length"));
-        ui.add(egui::DragValue::new(&mut settings.max_length).range(1..=32));
-    });
+    ui.add_space(theme.gap(2.0));
+    // Panjang minimum dan maksimum masing-masing di barisnya sendiri. Menaruh keduanya
+    // dalam satu baris akan meluber di sidebar sempit, dan melubernya tidak kelihatan
+    // sebagai kesalahan - hanya sebagai panel yang tidak rapi.
+    length_row(
+        ui,
+        theme,
+        messages,
+        "sidebar-min-length",
+        &mut settings.min_length,
+    );
+    length_row(
+        ui,
+        theme,
+        messages,
+        "sidebar-max-length",
+        &mut settings.max_length,
+    );
 
     ui.add_space(theme.gap(1.5));
     let estimate = settings
         .estimate()
         .map(format::count)
         .unwrap_or_else(|| messages.text("stat-value-unknown"));
-    widgets::muted(
-        ui,
-        theme,
-        &format!("{}: {estimate}", messages.text("sidebar-combinations")),
-    );
+    ui.horizontal(|ui| {
+        widgets::muted(ui, theme, &messages.text("sidebar-combinations"));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            widgets::mono(ui, theme, &estimate);
+        });
+    });
+}
+
+/// Satu baris panjang: label di kiri, nilai di kanan.
+fn length_row(ui: &mut Ui, theme: &Theme, messages: &Messages, key: &str, value: &mut u8) {
+    ui.horizontal(|ui| {
+        ui.label(
+            egui::RichText::new(messages.text(key))
+                .size(theme.type_scale.body)
+                .color(theme.text_muted),
+        );
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add(egui::DragValue::new(value).range(1..=32));
+        });
+    });
 }
 
 /// Menjelaskan kenapa rencananya belum bisa dijalankan.

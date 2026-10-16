@@ -170,7 +170,7 @@ impl Rule {
 ///
 /// Tanpa rantai, aturan hanya bisa diterapkan berdampingan pada kata dasar. Rangkaian
 /// `capitalize,append-digits` akan menghasilkan `Secret` dan `secret0` sampai `secret9`,
-/// tetapi tidak pernah `Secret7` — padahal huruf awal dibesarkan lalu diberi satu angka di
+/// tetapi tidak pernah `Secret7` - padahal huruf awal dibesarkan lalu diberi satu angka di
 /// belakang justru pola password yang paling sering dipakai orang. Aturan yang tidak bisa
 /// menyatakan pola itu tidak banyak gunanya.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

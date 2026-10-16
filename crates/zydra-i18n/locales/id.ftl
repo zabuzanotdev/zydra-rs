@@ -1,4 +1,4 @@
-# Zydra — katalog Bahasa Indonesia.
+# Zydra - katalog Bahasa Indonesia.
 #
 # Setiap kalimat yang dilihat pengguna tinggal di sini. Kode hanya menyebut kunci, jadi
 # mengubah kalimat tidak pernah menyentuh logika, dan menambah bahasa cukup menambah satu
@@ -90,7 +90,7 @@ log-level-success = BERHASIL
 progress-line = { $tried } dari { $total } dicoba, { $speed } per detik, sisa waktu { $eta }
 
 # Jendela
-app-window-title = Zydra — pemulihan password
+app-window-title = Zydra: pemulihan password
 app-subtitle = INTI PEMULIHAN
 
 # Aksi
@@ -113,9 +113,9 @@ sidebar-method-mask = Mask
 sidebar-wordlist = Wordlist
 sidebar-wordlist-empty = Belum ada wordlist
 sidebar-charset = Kelas karakter
-charset-lowercase = Huruf kecil a–z
-charset-uppercase = Huruf besar A–Z
-charset-digits = Angka 0–9
+charset-lowercase = Huruf kecil a-z
+charset-uppercase = Huruf besar A-Z
+charset-digits = Angka 0-9
 charset-symbols = Simbol !#%
 charset-space = Spasi
 sidebar-min-length = Panjang min
@@ -132,8 +132,8 @@ sidebar-rules-hint = misalnya none,capitalize+append-digits:9
 
 # Area kerja
 workspace-status-idle = Siap
-workspace-status-analyzing = Menganalisis…
-workspace-status-running = Mendekripsi…
+workspace-status-analyzing = Menganalisis...
+workspace-status-running = Mendekripsi...
 workspace-status-done = Selesai
 workspace-status-failed = Gagal
 workspace-status-cancelled = Dihentikan

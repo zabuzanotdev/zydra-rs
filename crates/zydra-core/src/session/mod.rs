@@ -72,7 +72,7 @@ impl SessionTracker {
     ///
     /// Sengaja tidak disimpan saat pelacak dibuat. Pelacak bisa hidup lebih lama daripada
     /// berkasnya, dan sidik jari yang basi akan membuat berkas yang sudah berubah tetap
-    /// dianggap cocok — justru keadaan yang paling berbahaya, karena serangan akan
+    /// dianggap cocok - justru keadaan yang paling berbahaya, karena serangan akan
     /// dilanjutkan dari posisi yang tidak lagi berarti.
     fn fingerprint(&self) -> Option<TargetFingerprint> {
         TargetFingerprint::of(self.target.as_ref()?).ok()

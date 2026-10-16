@@ -20,7 +20,10 @@ pub fn segmented<T: PartialEq + Copy>(
         .corner_radius(theme.control_radius())
         .inner_margin(Margin::same(2))
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
+            // Membungkus, bukan memanjang: tiga pilihan tidak muat dalam satu baris di
+            // sidebar selebar 240 piksel, dan memaksanya akan memotong label atau
+            // meluberkan panelnya.
+            ui.horizontal_wrapped(|ui| {
                 for (value, label) in options {
                     let is_selected = *value == selected;
                     let text = RichText::new(label).size(theme.type_scale.body);
@@ -56,7 +59,7 @@ pub fn file_row(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 match value {
-                    Some(name) => super::mono(ui, theme, name),
+                    Some(name) => super::mono(ui, theme, super::truncate(name, 26).as_str()),
                     None => super::muted(ui, theme, empty_text),
                 }
                 // Tombol pilih selalu di kanan; saat lebar penuh ia pindah ke bawah.

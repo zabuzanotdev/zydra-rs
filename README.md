@@ -118,7 +118,7 @@ Aturan yang tersedia: `none`, `capitalize`, `upper`, `lower`, `reverse`, `leet`,
 misalnya `append-digits:4`.
 
 Rantai `capitalize+append-digits:9` mengubah kata `admin` menjadi `Admin0` sampai
-`Admin9` — pola password yang paling sering dipakai orang, dan itu sebabnya rantai
+`Admin9` - pola password yang paling sering dipakai orang, dan itu sebabnya rantai
 didukung: tanpa rantai, aturan hanya bisa diterapkan berdampingan pada kata dasar, dan
 kombinasi itu tidak akan pernah tercoba.
 
@@ -158,7 +158,7 @@ zydra -f vault.zip -b letters,digits -m 1 -x 8 --resume
 ```
 
 Posisi hanya berlaku untuk berkas yang persis sama. Setiap sesi menyimpan sidik jari
-berkasnya — lokasi, ukuran, waktu perubahan, dan jenisnya. Kalau berkasnya sudah berubah,
+berkasnya - lokasi, ukuran, waktu perubahan, dan jenisnya. Kalau berkasnya sudah berubah,
 Zydra menolak melanjutkan dan mengatakannya, alih-alih melanjutkan dari posisi yang tidak
 lagi berarti atau diam-diam memulai dari awal.
 
@@ -294,7 +294,7 @@ A ground-up Rust rewrite of [Zydra](https://github.com/hamedA2/Zydra), originall
 single-file Python script. The behaviour was ported; the implementation was written from
 scratch, with the logic separated from every user interface.
 
-> **Use it only on files you own** — for example when you forgot your own password — on
+> **Use it only on files you own** - for example when you forgot your own password - on
 > security audits you have written permission for, or in CTF practice. Do not point this
 > at someone else's files without permission.
 
@@ -355,7 +355,7 @@ zydra-gui ──┐
 zydra-cli ──┘
 ```
 
-`zydra-core` holds the recovery logic and knows nothing about any interface — it contains
+`zydra-core` holds the recovery logic and knows nothing about any interface - it contains
 no sentence a user will ever read. `zydra-i18n` is the only place text lives. Adding a
 format means adding one file under `zydra-core/src/tester/`; adding a language means
 adding one `.ftl` file.

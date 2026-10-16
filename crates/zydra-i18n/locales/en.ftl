@@ -1,4 +1,4 @@
-# Zydra — English catalogue.
+# Zydra - English catalogue.
 #
 # Every user-visible sentence lives here. The code only ever refers to keys, so a wording
 # change never requires touching logic, and adding a language means adding one file.
@@ -89,7 +89,7 @@ log-level-success = OK
 progress-line = { $tried } of { $total } tried, { $speed } per second, ETA { $eta }
 
 # Window
-app-window-title = Zydra — password recovery
+app-window-title = Zydra: password recovery
 app-subtitle = RECOVERY CORE
 
 # Actions
@@ -112,9 +112,9 @@ sidebar-method-mask = Mask
 sidebar-wordlist = Wordlist
 sidebar-wordlist-empty = No wordlist selected
 sidebar-charset = Character set
-charset-lowercase = Lowercase a–z
-charset-uppercase = Uppercase A–Z
-charset-digits = Digits 0–9
+charset-lowercase = Lowercase a-z
+charset-uppercase = Uppercase A-Z
+charset-digits = Digits 0-9
 charset-symbols = Symbols !#%
 charset-space = Space
 sidebar-min-length = Min length
@@ -131,8 +131,8 @@ sidebar-rules-hint = for example none,capitalize+append-digits:9
 
 # Workspace
 workspace-status-idle = Ready
-workspace-status-analyzing = Analyzing…
-workspace-status-running = Decrypting…
+workspace-status-analyzing = Analyzing...
+workspace-status-running = Decrypting...
 workspace-status-done = Finished
 workspace-status-failed = Failed
 workspace-status-cancelled = Stopped
