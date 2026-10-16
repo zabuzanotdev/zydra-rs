@@ -31,6 +31,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Versi binary datang dari Cargo.toml, bukan dari nama tag. Tanpa pemeriksaan ini,
+      # tag dan isi paketnya bisa berbeda dan tidak ada yang menyadarinya sampai pengguna
+      # menjalankan --version dan melihat nomor yang salah.
+      - name: Periksa versi tag cocok dengan Cargo.toml
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          declared="$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')"
+          echo "tag: $tag, Cargo.toml: $declared"
+          if [ "$tag" != "$declared" ]; then
+            echo "::error::tag v$tag tidak cocok dengan versi di Cargo.toml ($declared)"
+            exit 1
+          fi
       - name: Pasang dependensi Linux
         if: runner.os == 'Linux'
         run: |
