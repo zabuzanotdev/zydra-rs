@@ -23,6 +23,12 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "zydra",
         options,
-        Box::new(|context| Ok(Box::new(ZydraApp::new(context)))),
+        Box::new(|context| {
+            let mut app = ZydraApp::new(context);
+            // Pengaturan dimuat sebelum bingkai pertama digambar, supaya bahasa yang
+            // tersimpan tidak tampil terlambat satu bingkai.
+            app.load_config();
+            Ok(Box::new(app))
+        }),
     )
 }

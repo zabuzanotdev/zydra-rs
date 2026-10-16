@@ -9,6 +9,7 @@
 
 pub mod attack;
 pub mod candidate;
+pub mod config;
 pub mod constants;
 pub mod engine;
 pub mod error;

@@ -158,3 +158,16 @@ cli-value-log = BERKAS
 error-log-export = Catatan aktivitas tidak bisa ditulis
 action-export-log = Ekspor log
 log-exported = Catatan aktivitas ditulis ke { $path }
+
+# Pengaturan
+settings-title = Opsi
+settings-language = Bahasa
+settings-language-auto = Otomatis
+settings-workers = Jumlah worker
+settings-workers-auto = Otomatis
+settings-max-combinations = Batas kombinasi
+settings-max-brute-length = Panjang maksimum brute force
+settings-save = Simpan
+settings-reset = Kembalikan ke bawaan
+settings-saved = Pengaturan disimpan
+settings-invalid = Nilai itu tidak bisa dipakai, jadi tidak ada yang disimpan

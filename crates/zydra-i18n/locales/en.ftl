@@ -157,3 +157,16 @@ cli-value-log = FILE
 error-log-export = The activity log could not be written
 action-export-log = Export log
 log-exported = Activity log written to { $path }
+
+# Settings
+settings-title = Options
+settings-language = Language
+settings-language-auto = Automatic
+settings-workers = Worker threads
+settings-workers-auto = Automatic
+settings-max-combinations = Maximum combinations
+settings-max-brute-length = Maximum brute-force length
+settings-save = Save
+settings-reset = Restore defaults
+settings-saved = Settings saved
+settings-invalid = Those values cannot be used, so nothing was saved

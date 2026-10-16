@@ -11,12 +11,13 @@ use eframe::App;
 use egui::{Context, RichText};
 
 use zydra_core::attack::AttackLimits;
+use zydra_core::config::{AppConfig, ConfigStore, LanguageChoice};
 use zydra_core::engine::crack::EngineConfig;
 use zydra_core::model::target::CrackTarget;
 use zydra_i18n::{Locale, Messages};
 
 use crate::controller::Controller;
-use crate::panels::{sidebar, workspace};
+use crate::panels::{settings, sidebar, workspace};
 use crate::responsive::LayoutMode;
 use crate::state::UiSettings;
 use crate::theme::Theme;
@@ -39,6 +40,11 @@ pub struct ZydraApp {
     resume_available: bool,
     /// Keadaan berjalan pada bingkai sebelumnya, untuk mengetahui kapan serangan berakhir.
     was_running: bool,
+    /// Pengaturan yang bertahan antar sesi.
+    config: AppConfig,
+    /// Tempat pengaturan itu disimpan. `None` kalau direktori konfigurasi tidak bisa
+    /// ditentukan, dan panelnya tetap bisa dipakai untuk sesi ini saja.
+    config_store: Option<ConfigStore>,
 }
 
 impl ZydraApp {
@@ -59,9 +65,86 @@ impl ZydraApp {
             notice: None,
             resume_available: false,
             was_running: false,
+            config: AppConfig::default(),
+            config_store: None,
         };
         app.settings.sidebar_open = true;
         app
+    }
+
+    /// Memuat pengaturan tersimpan, lalu menerapkannya.
+    ///
+    /// Dipanggil setelah konteks egui siap karena bahasa yang tersimpan harus dipasang ke
+    /// katalog sebelum bingkai pertama digambar. Tanpa itu, jendela akan tampil dalam bahasa
+    /// sistem selama satu bingkai sebelum berubah.
+    pub fn load_config(&mut self) {
+        let Ok(store) = ConfigStore::in_user_config_dir() else {
+            return;
+        };
+        let (config, problem) = store.load();
+        self.config = config;
+        self.config_store = Some(store);
+        self.apply_language();
+
+        // Pengaturan yang rusak diganti bawaan, tetapi pengguna yang mengubah berkasnya
+        // sendiri perlu tahu bahwa perubahannya diabaikan.
+        if let Some(error) = problem {
+            self.controller.note(
+                zydra_core::log::LogLevel::Warn,
+                "error-unknown",
+                &[("detail", &error.to_string())],
+            );
+        }
+    }
+
+    /// Menerapkan pilihan bahasa dari pengaturan.
+    fn apply_language(&mut self) {
+        if let Some(locale) = locale_for(self.config.language) {
+            self.messages.set_locale(locale);
+        }
+    }
+
+    /// Menyimpan pengaturan, dan mencatat hasilnya.
+    fn save_config(&mut self) {
+        let Some(store) = self.config_store.as_ref() else {
+            // Tanpa tempat menyimpan, pengaturannya tetap berlaku untuk sesi ini. Menolak
+            // menyimpan akan lebih membingungkan daripada menerimanya.
+            self.controller
+                .note(zydra_core::log::LogLevel::Info, "settings-saved", &[]);
+            return;
+        };
+
+        match store.save(&self.config) {
+            Ok(()) => self
+                .controller
+                .note(zydra_core::log::LogLevel::Info, "settings-saved", &[]),
+            Err(error) => {
+                self.controller
+                    .note(zydra_core::log::LogLevel::Error, "settings-invalid", &[]);
+                self.controller.note(
+                    zydra_core::log::LogLevel::Error,
+                    "error-unknown",
+                    &[("detail", &error.to_string())],
+                );
+            }
+        }
+    }
+
+    /// Batas serangan dari pengaturan.
+    fn limits(&self) -> AttackLimits {
+        AttackLimits {
+            max_combinations: self.config.max_combinations,
+            max_brute_length: self.config.max_brute_length,
+        }
+    }
+
+    /// Pengaturan mesin dari pengaturan.
+    fn engine_config(&self) -> EngineConfig {
+        EngineConfig {
+            workers: self.config.workers,
+            batch_size: self.config.batch_size,
+            progress_interval: Duration::from_millis(self.config.progress_interval_ms),
+        }
     }
 
     /// Aplikasi dengan bahasa tertentu. Dipakai pengujian dan pengembangan.
@@ -204,8 +287,10 @@ impl ZydraApp {
         let Some(target) = self.settings.target.clone() else {
             return;
         };
-        let limits = AttackLimits::default();
-        let config = EngineConfig::default();
+        let limits = self.limits();
+        let config = self.engine_config();
+        self.controller
+            .use_zip_max_entry_bytes(self.config.zip_max_entry_bytes);
 
         // Sebab kegagalan sudah disimpan pengendali dan akan ditampilkan area kerja dengan
         // kalimat yang tepat, jadi tidak ada pemberitahuan umum yang perlu ditambah.
@@ -249,6 +334,7 @@ impl App for ZydraApp {
         });
 
         let mut actions = sidebar::SidebarActions::default();
+        let mut settings_actions = settings::SettingsActions::default();
 
         if layout.sidebar_is_beside() {
             let width = layout.sidebar_width().unwrap_or(240.0);
@@ -267,6 +353,24 @@ impl App for ZydraApp {
                         self.controller.phase().is_finished(),
                         self.resume_available,
                     );
+
+                    ui.add_space(self.theme.gap(4.0));
+                    // Dilipat supaya panel pilihan tetap pendek; pengaturan diubah jauh
+                    // lebih jarang daripada target dan metode.
+                    settings_actions =
+                        egui::CollapsingHeader::new(self.messages.text("settings-title"))
+                            .default_open(false)
+                            .show(ui, |ui| {
+                                settings::settings_panel(
+                                    ui,
+                                    &self.theme,
+                                    &self.messages,
+                                    &mut self.config,
+                                    layout,
+                                )
+                            })
+                            .body_returned
+                            .unwrap_or_default();
                 });
         } else {
             egui::TopBottomPanel::top("options").show(ctx, |ui| {
@@ -284,6 +388,14 @@ impl App for ZydraApp {
                     );
                 }
             });
+        }
+
+        if settings_actions.save {
+            self.save_config();
+        }
+        if settings_actions.reset {
+            self.config.reset();
+            self.apply_language();
         }
 
         let mut copy_password = None;
@@ -328,6 +440,15 @@ impl App for ZydraApp {
 
         let _ = full_width;
         self.handle_sidebar_actions(actions, ctx, layout);
+    }
+}
+
+/// Bahasa yang dipilih pengaturan, atau `None` kalau harus mengikuti sistem.
+fn locale_for(choice: LanguageChoice) -> Option<Locale> {
+    match choice {
+        LanguageChoice::Auto => None,
+        LanguageChoice::En => Some(Locale::En),
+        LanguageChoice::Id => Some(Locale::Id),
     }
 }
 

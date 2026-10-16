@@ -89,6 +89,8 @@ pub struct Controller {
     sessions: SessionTracker,
     /// Pelacak sesi yang dipilih pemanggil, mengalahkan direktori data pengguna.
     session_override: Option<SessionTracker>,
+    /// Batas byte entri ZIP yang dibaca saat memverifikasi kandidat.
+    zip_max_entry_bytes: Option<u64>,
 }
 
 impl Default for Controller {
@@ -108,7 +110,13 @@ impl Controller {
             plan: None,
             sessions: SessionTracker::disabled(),
             session_override: None,
+            zip_max_entry_bytes: None,
         }
+    }
+
+    /// Menentukan batas byte entri ZIP yang dibaca saat memverifikasi kandidat.
+    pub fn use_zip_max_entry_bytes(&mut self, bytes: u64) {
+        self.zip_max_entry_bytes = Some(bytes);
     }
 
     /// Memakai pelacak sesi tertentu alih-alih direktori data pengguna.
@@ -234,7 +242,10 @@ impl Controller {
         );
 
         let cancel = CancelToken::new();
-        let factory: Arc<dyn TesterFactory> = Arc::new(DefaultTesterFactory::new());
+        let factory: Arc<dyn TesterFactory> = match self.zip_max_entry_bytes {
+            Some(bytes) => Arc::new(DefaultTesterFactory::with_zip_max_entry_bytes(bytes)),
+            None => Arc::new(DefaultTesterFactory::new()),
+        };
 
         // Pemeriksaan awal: target dibuka sekali sebelum pekerjaan dimulai. Tanpa ini,
         // berkas yang hilang atau backend yang tidak tersedia baru ketahuan setelah
