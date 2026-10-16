@@ -22,6 +22,8 @@ use crate::widgets::{
 pub struct WorkspaceActions {
     /// Tombol salin password ditekan.
     pub copy: bool,
+    /// Tombol ekspor catatan ditekan.
+    pub export_log: bool,
 }
 
 /// Menggambar area kerja.
@@ -43,7 +45,7 @@ pub fn workspace(
     ui.add_space(theme.gap(3.0));
     result_section(ui, theme, messages, controller, &mut actions, layout);
     ui.add_space(theme.gap(3.0));
-    activity(ui, theme, messages, controller, layout);
+    activity(ui, theme, messages, controller, &mut actions, layout);
 
     actions
 }
@@ -234,9 +236,18 @@ fn activity(
     theme: &Theme,
     messages: &Messages,
     controller: &Controller,
+    actions: &mut WorkspaceActions,
     layout: LayoutMode,
 ) {
-    widgets::section_label(ui, theme, &messages.text("workspace-activity"));
+    ui.horizontal(|ui| {
+        widgets::section_label(ui, theme, &messages.text("workspace-activity"));
+        // Tombol ekspor hanya berguna kalau memang ada yang bisa diekspor.
+        if !controller.log().is_empty() {
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                actions.export_log = ui.button(messages.text("action-export-log")).clicked();
+            });
+        }
+    });
     ui.add_space(theme.gap(1.0));
     let rows = layout.log_rows();
     log_console::log_console(

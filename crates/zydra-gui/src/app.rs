@@ -173,6 +173,30 @@ impl ZydraApp {
         }
     }
 
+    /// Menulis catatan aktivitas ke berkas yang dipilih pengguna.
+    fn export_activity_log(&mut self) {
+        let suggested = suggested_log_file_name(self.settings.target.as_ref());
+        let Some(path) = rfd::FileDialog::new().set_file_name(suggested).save_file() else {
+            return;
+        };
+
+        match zydra_i18n::export::write_log(self.controller.log(), &self.messages, &path) {
+            Ok(()) => {
+                self.notice = None;
+                // Hasilnya masuk ke catatan yang sama, supaya pengguna menemukannya di
+                // tempat yang memang ia lihat alih-alih di pemberitahuan yang bisa terlewat.
+                self.controller.note(
+                    zydra_core::log::LogLevel::Info,
+                    "log-exported",
+                    &[("path", path.to_string_lossy().as_ref())],
+                );
+            }
+            Err(_) => {
+                self.notice = Some("error-log-export".to_string());
+            }
+        }
+    }
+
     fn start(&mut self, ctx: &Context, layout: LayoutMode, resume: bool) {
         let Ok(plan) = self.settings.plan() else {
             return;
@@ -263,6 +287,7 @@ impl App for ZydraApp {
         }
 
         let mut copy_password = None;
+        let mut export_log = false;
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(self.theme.gap(2.0));
@@ -286,6 +311,10 @@ impl App for ZydraApp {
                     copy_password = Some(password.clone());
                 }
             }
+
+            if workspace_actions.export_log {
+                export_log = true;
+            }
         });
 
         if let Some(password) = copy_password {
@@ -293,9 +322,42 @@ impl App for ZydraApp {
             self.settings.mark_copied();
         }
 
+        if export_log {
+            self.export_activity_log();
+        }
+
         let _ = full_width;
         self.handle_sidebar_actions(actions, ctx, layout);
     }
+}
+
+/// Nama berkas yang diusulkan saat mengekspor catatan.
+///
+/// Diturunkan dari nama berkas target supaya beberapa pekerjaan yang diekspor ke direktori
+/// yang sama tidak saling menimpa. Karakter yang tidak aman untuk nama berkas diganti.
+pub fn suggested_log_file_name(target: Option<&CrackTarget>) -> String {
+    let stem = target
+        .and_then(|target| {
+            std::path::Path::new(&target.display_name)
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+        })
+        .filter(|stem| !stem.is_empty())
+        .unwrap_or_else(|| "zydra".to_string());
+
+    let safe: String = stem
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || character == '-' || character == '_' {
+                character
+            } else {
+                '-'
+            }
+        })
+        .take(40)
+        .collect();
+
+    format!("{safe}-activity.log")
 }
 
 /// Membuka dialog berkas asli sistem.
@@ -305,4 +367,63 @@ impl App for ZydraApp {
 /// pengguna sendiri yang memintanya.
 fn pick_file() -> Option<std::path::PathBuf> {
     rfd::FileDialog::new().pick_file()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_suggested_name_follows_the_target() {
+        let target = CrackTarget::from_path("/tmp/vault.zip");
+        assert_eq!(suggested_log_file_name(Some(&target)), "vault-activity.log");
+    }
+
+    #[test]
+    fn different_targets_get_different_suggested_names() {
+        // Beberapa pekerjaan yang diekspor ke direktori yang sama tidak boleh saling
+        // menimpa tanpa disadari.
+        let first = CrackTarget::from_path("/tmp/vault.zip");
+        let second = CrackTarget::from_path("/tmp/archive.rar");
+        assert_ne!(
+            suggested_log_file_name(Some(&first)),
+            suggested_log_file_name(Some(&second))
+        );
+    }
+
+    #[test]
+    fn without_a_target_a_generic_name_is_used() {
+        assert_eq!(suggested_log_file_name(None), "zydra-activity.log");
+    }
+
+    #[test]
+    fn odd_characters_in_the_target_name_are_replaced() {
+        let target = CrackTarget {
+            kind: zydra_core::model::target::TargetKind::Zip,
+            path: "x".into(),
+            display_name: "my file: v2?.zip".to_string(),
+        };
+        let name = suggested_log_file_name(Some(&target));
+        assert!(
+            name.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.'),
+            "unsafe suggested name: {name}"
+        );
+        assert!(name.ends_with("-activity.log"), "{name}");
+    }
+
+    #[test]
+    fn a_very_long_target_name_is_shortened() {
+        let target = CrackTarget {
+            kind: zydra_core::model::target::TargetKind::Zip,
+            path: "x".into(),
+            display_name: format!("{}.zip", "a".repeat(200)),
+        };
+        let name = suggested_log_file_name(Some(&target));
+        assert!(
+            name.len() < 80,
+            "suggested name is too long: {len}",
+            len = name.len()
+        );
+    }
 }

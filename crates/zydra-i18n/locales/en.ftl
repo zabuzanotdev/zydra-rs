@@ -155,3 +155,5 @@ log-export-header = Zydra activity log, exported at { $time } UTC
 cli-help-export-log = Write the activity log to a file when the run finishes
 cli-value-log = FILE
 error-log-export = The activity log could not be written
+action-export-log = Export log
+log-exported = Activity log written to { $path }

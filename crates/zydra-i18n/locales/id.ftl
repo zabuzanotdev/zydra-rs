@@ -156,3 +156,5 @@ log-export-header = Catatan aktivitas Zydra, diekspor pada { $time } UTC
 cli-help-export-log = Tulis catatan aktivitas ke berkas setelah serangan selesai
 cli-value-log = BERKAS
 error-log-export = Catatan aktivitas tidak bisa ditulis
+action-export-log = Ekspor log
+log-exported = Catatan aktivitas ditulis ke { $path }

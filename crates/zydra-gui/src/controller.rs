@@ -332,6 +332,19 @@ impl Controller {
         }
     }
 
+    /// Menambahkan satu catatan dari luar pengendali.
+    ///
+    /// Dipakai antarmuka untuk mencatat hal yang bukan bagian dari serangan, misalnya hasil
+    /// mengekspor catatan. Menaruhnya di catatan yang sama membuat pengguna menemukannya di
+    /// tempat yang memang ia lihat, bukan di pemberitahuan terpisah yang bisa terlewat.
+    pub fn note(&mut self, level: LogLevel, key: &str, args: &[(&str, &str)]) {
+        let mut entry = LogEntry::now(level, key);
+        for (name, value) in args {
+            entry = entry.with_arg(*name, *value);
+        }
+        self.log.push(entry);
+    }
+
     /// Membersihkan keadaan setelah serangan selesai.
     pub fn reset(&mut self) {
         if self.is_running() {
