@@ -22,12 +22,7 @@ pub fn progress_bar(ui: &mut Ui, theme: &Theme, fraction: f32, height: f32) {
     let radius = CornerRadius::same((height / 2.0) as u8);
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, radius, theme.bg_track);
-    painter.rect_stroke(
-        rect,
-        radius,
-        theme.card_stroke(),
-        egui::StrokeKind::Inside,
-    );
+    painter.rect_stroke(rect, radius, theme.card_stroke(), egui::StrokeKind::Inside);
     if fraction > 0.0 {
         let fill_width = (rect.width() * fraction).max(height);
         let fill_rect = egui::Rect::from_min_size(rect.min, egui::vec2(fill_width, height));

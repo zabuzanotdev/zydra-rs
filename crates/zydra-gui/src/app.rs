@@ -417,20 +417,20 @@ impl App for ZydraApp {
                     ..Default::default()
                 })
                 .show(ctx, |ui| {
-                if self.settings.sidebar_open {
-                    ui.add_space(self.theme.gap(1.0));
-                    actions = sidebar::sidebar(
-                        ui,
-                        &self.theme,
-                        &self.messages,
-                        &mut self.settings,
-                        layout,
-                        self.controller.is_running(),
-                        self.controller.phase().is_finished(),
-                        self.resume_available,
-                    );
-                }
-            });
+                    if self.settings.sidebar_open {
+                        ui.add_space(self.theme.gap(1.0));
+                        actions = sidebar::sidebar(
+                            ui,
+                            &self.theme,
+                            &self.messages,
+                            &mut self.settings,
+                            layout,
+                            self.controller.is_running(),
+                            self.controller.phase().is_finished(),
+                            self.resume_available,
+                        );
+                    }
+                });
         }
 
         if settings_actions.save {
@@ -454,32 +454,33 @@ impl App for ZydraApp {
                 ..Default::default()
             })
             .show(ctx, |ui| {
-            ui.add_space(self.theme.gap(2.0));
-
-            if let Some(key) = self.notice.clone() {
-                ui.colored_label(self.theme.error, self.messages.text(&key));
                 ui.add_space(self.theme.gap(2.0));
-            }
 
-            let workspace_actions = workspace::workspace(
-                ui,
-                &self.theme,
-                &self.messages,
-                &self.controller,
-                &self.settings,
-                layout,
-            );
-
-            if workspace_actions.copy {
-                if let crate::controller::Phase::Done { password, .. } = self.controller.phase() {
-                    copy_password = Some(password.clone());
+                if let Some(key) = self.notice.clone() {
+                    ui.colored_label(self.theme.error, self.messages.text(&key));
+                    ui.add_space(self.theme.gap(2.0));
                 }
-            }
 
-            if workspace_actions.export_log {
-                export_log = true;
-            }
-        });
+                let workspace_actions = workspace::workspace(
+                    ui,
+                    &self.theme,
+                    &self.messages,
+                    &self.controller,
+                    &self.settings,
+                    layout,
+                );
+
+                if workspace_actions.copy {
+                    if let crate::controller::Phase::Done { password, .. } = self.controller.phase()
+                    {
+                        copy_password = Some(password.clone());
+                    }
+                }
+
+                if workspace_actions.export_log {
+                    export_log = true;
+                }
+            });
 
         if let Some(password) = copy_password {
             ctx.copy_text(password);

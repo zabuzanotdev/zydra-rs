@@ -101,8 +101,14 @@ mod tests {
     #[test]
     fn the_z_mark_uses_the_accent_colour() {
         // Bilah atas Z.
-        assert_eq!((pixel(32, 23).0, pixel(32, 23).1, pixel(32, 23).2), (ACCENT[0], ACCENT[1], ACCENT[2]));
+        assert_eq!(
+            (pixel(32, 23).0, pixel(32, 23).1, pixel(32, 23).2),
+            (ACCENT[0], ACCENT[1], ACCENT[2])
+        );
         // Bilah bawah Z.
-        assert_eq!((pixel(32, 41).0, pixel(32, 41).1, pixel(32, 41).2), (ACCENT[0], ACCENT[1], ACCENT[2]));
+        assert_eq!(
+            (pixel(32, 41).0, pixel(32, 41).1, pixel(32, 41).2),
+            (ACCENT[0], ACCENT[1], ACCENT[2])
+        );
     }
 }
