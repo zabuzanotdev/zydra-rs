@@ -314,6 +314,23 @@ impl App for ZydraApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         self.controller.poll();
 
+        // Berkas yang dijatuhkan ke jendela langsung menjadi target. Ini perilaku
+        // native lintas platform (kecuali Wayland yang belum didukung winit),
+        // dan jauh lebih cepat daripada klik Browse untuk satu berkas.
+        let dropped: Vec<std::path::PathBuf> = ctx.input(|input| {
+            input
+                .raw
+                .dropped_files
+                .iter()
+                .filter_map(|file| file.path.clone())
+                .collect()
+        });
+        if let Some(path) = dropped.first() {
+            self.settings.target = Some(CrackTarget::from_path(path));
+            self.notice = None;
+            self.refresh_resume();
+        }
+
         if self.controller.is_running() {
             ctx.request_repaint_after(RUNNING_REPAINT);
         }
