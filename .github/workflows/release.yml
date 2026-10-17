@@ -68,35 +68,38 @@ jobs:
       - name: Build
         run: cargo build --release --workspace --target ${{ matrix.target }}
 
-      # Paket rilis memuat binary, dokumen lisensi, dan README. Menyertakan lisensi di
-      # dalam paket bukan kesopanan: GPL mewajibkannya, dan pengguna yang mengunduh satu
-      # berkas saja tidak punya cara lain mendapatkannya.
+      # Paket rilis dipisah CLI vs GUI supaya pengguna awam tidak bingung melihat
+      # dua exe dalam satu zip. Lisensi tetap disertakan di tiap paket (wajib GPL).
       - name: Kemas
         shell: bash
         run: |
           set -euo pipefail
           target="${{ matrix.target }}"
-          nama="zydra-${target}"
-          mkdir -p "dist/${nama}"
 
           ext=""
           if [ "${target}" = "x86_64-pc-windows-msvc" ]; then
             ext=".exe"
           fi
 
-          cp "target/${target}/release/zydra${ext}" "dist/${nama}/"
-          cp "target/${target}/release/zydra-gui${ext}" "dist/${nama}/"
-          cp LICENSE LICENSE-MIT-Zydra.txt NOTICE README.md "dist/${nama}/"
+          pack() {
+            nama="$1"
+            bin="$2"
+            mkdir -p "dist/${nama}"
+            cp "target/${target}/release/${bin}${ext}" "dist/${nama}/"
+            cp LICENSE LICENSE-MIT-Zydra.txt NOTICE README.md "dist/${nama}/"
+            cd dist
+            if [ "${ext}" = ".exe" ]; then
+              powershell -NoProfile -Command "Compress-Archive -Path '${nama}' -DestinationPath '${nama}.zip'"
+            else
+              tar czf "${nama}.tar.gz" "${nama}"
+            fi
+            cd ..
+          }
 
-          cd dist
-          if [ "${ext}" = ".exe" ]; then
-            # Runner Windows punya bsdtar, tetapi Compress-Archive lebih pasti
-            # menghasilkan arsip zip yang bisa dibuka Windows Explorer.
-            powershell -NoProfile -Command "Compress-Archive -Path '${nama}' -DestinationPath '${nama}.zip'"
-          else
-            tar czf "${nama}.tar.gz" "${nama}"
-          fi
-          ls -l
+          pack "zydra-cli-${target}" "zydra"
+          pack "zydra-gui-${target}" "zydra-gui"
+
+          ls -l dist
 
       - name: Simpan paket
         uses: actions/upload-artifact@v4

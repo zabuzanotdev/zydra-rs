@@ -18,3 +18,9 @@ zydra-i18n = { version = "0.1.0", path = "../zydra-i18n" }
 [dev-dependencies]
 tempfile.workspace = true
 zip.workspace = true
+
+# Nama binary dikunci eksplisit supaya paket lintas platform stabil:
+# `zydra` untuk CLI, `zydra-gui` untuk antarmuka.
+[[bin]]
+name = "zydra-gui"
+path = "src/main.rs"
