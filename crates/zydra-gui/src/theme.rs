@@ -120,8 +120,31 @@ impl Theme {
         visuals.panel_fill = self.bg_app;
         visuals.window_fill = self.bg_panel;
         visuals.extreme_bg_color = self.bg_console;
+        visuals.faint_bg_color = self.bg_track;
+        visuals.code_bg_color = self.bg_console;
+        visuals.text_edit_bg_color = Some(self.bg_console);
+        visuals.warn_fg_color = self.warning;
+        visuals.error_fg_color = self.error;
         visuals.override_text_color = Some(self.text);
         visuals.window_stroke = self.card_stroke();
+        visuals.window_corner_radius = self.control_radius();
+        visuals.menu_corner_radius = self.control_radius();
+        visuals.window_shadow = egui::Shadow {
+            offset: [0, 8],
+            blur: 24,
+            spread: 0,
+            color: Color32::from_black_alpha(80),
+        };
+        visuals.popup_shadow = egui::Shadow {
+            offset: [0, 4],
+            blur: 12,
+            spread: 0,
+            color: Color32::from_black_alpha(96),
+        };
+        visuals.button_frame = true;
+        visuals.collapsing_header_frame = false;
+        visuals.indent_has_left_vline = false;
+        visuals.striped = false;
         visuals.selection.bg_fill = self.accent.gamma_multiply(0.35);
         visuals.selection.stroke = Stroke::new(HAIRLINE, self.accent);
         visuals.hyperlink_color = self.accent;

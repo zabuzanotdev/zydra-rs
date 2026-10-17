@@ -329,9 +329,15 @@ impl App for ZydraApp {
         let layout = LayoutMode::from_width(ctx.screen_rect().width());
         let full_width = layout.buttons_are_full_width();
 
-        egui::TopBottomPanel::top("header").show(ctx, |ui| {
-            self.top_bar(ui, layout);
-        });
+        egui::TopBottomPanel::top("header")
+            .frame(egui::Frame {
+                fill: self.theme.bg_panel,
+                inner_margin: egui::Margin::symmetric(12, 8),
+                ..Default::default()
+            })
+            .show(ctx, |ui| {
+                self.top_bar(ui, layout);
+            });
 
         let mut actions = sidebar::SidebarActions::default();
         let mut settings_actions = settings::SettingsActions::default();
@@ -341,6 +347,11 @@ impl App for ZydraApp {
             egui::SidePanel::left("options")
                 .exact_width(width)
                 .resizable(false)
+                .frame(egui::Frame {
+                    fill: self.theme.bg_panel,
+                    inner_margin: egui::Margin::same(12),
+                    ..Default::default()
+                })
                 .show(ctx, |ui| {
                     ui.add_space(self.theme.gap(2.0));
                     actions = sidebar::sidebar(
@@ -373,7 +384,13 @@ impl App for ZydraApp {
                             .unwrap_or_default();
                 });
         } else {
-            egui::TopBottomPanel::top("options").show(ctx, |ui| {
+            egui::TopBottomPanel::top("options")
+                .frame(egui::Frame {
+                    fill: self.theme.bg_panel,
+                    inner_margin: egui::Margin::same(12),
+                    ..Default::default()
+                })
+                .show(ctx, |ui| {
                 if self.settings.sidebar_open {
                     ui.add_space(self.theme.gap(1.0));
                     actions = sidebar::sidebar(
@@ -401,7 +418,13 @@ impl App for ZydraApp {
         let mut copy_password = None;
         let mut export_log = false;
 
-        egui::CentralPanel::default().show(ctx, |ui| {
+        egui::CentralPanel::default()
+            .frame(egui::Frame {
+                fill: self.theme.bg_app,
+                inner_margin: egui::Margin::same(12),
+                ..Default::default()
+            })
+            .show(ctx, |ui| {
             ui.add_space(self.theme.gap(2.0));
 
             if let Some(key) = self.notice.clone() {

@@ -1,4 +1,8 @@
 //! Titik masuk antarmuka grafis.
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
 
 use eframe::egui;
 use zydra_gui::app::ZydraApp;
@@ -14,9 +18,12 @@ fn main() -> eframe::Result<()> {
 
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
+            .with_app_id("dev.zydra.zydra")
             .with_title(title)
             .with_inner_size([DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT])
             .with_min_inner_size([MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT]),
+        vsync: true,
+        centered: true,
         ..Default::default()
     };
 
