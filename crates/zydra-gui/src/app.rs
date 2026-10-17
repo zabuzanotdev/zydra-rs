@@ -346,6 +346,15 @@ impl App for ZydraApp {
         let layout = LayoutMode::from_width(ctx.screen_rect().width());
         let full_width = layout.buttons_are_full_width();
 
+        // Pintasan native: Cmd/Ctrl+O membuka dialog target. COMMAND otomatis
+        // menjadi Ctrl di Windows/Linux dan Cmd di macOS.
+        let open_pressed = ctx.input_mut(|input| {
+            input.consume_shortcut(&egui::KeyboardShortcut::new(
+                egui::Modifiers::COMMAND,
+                egui::Key::O,
+            ))
+        });
+
         egui::TopBottomPanel::top("header")
             .frame(egui::Frame {
                 fill: self.theme.bg_panel,
@@ -431,6 +440,9 @@ impl App for ZydraApp {
             self.config.reset();
             self.apply_language();
         }
+
+        // Pintasan ikut ke aksi yang sama dengan tombol Browse, supaya satu jalur.
+        actions.browse_target |= open_pressed && !self.controller.is_running();
 
         let mut copy_password = None;
         let mut export_log = false;

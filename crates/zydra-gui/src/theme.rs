@@ -143,6 +143,13 @@ impl Theme {
         };
         visuals.button_frame = true;
         visuals.collapsing_header_frame = false;
+        visuals.text_cursor = egui::style::TextCursorStyle {
+            stroke: Stroke::new(2.0_f32, self.accent),
+            preview: false,
+            blink: true,
+            on_duration: 0.5,
+            off_duration: 0.5,
+        };
         visuals.indent_has_left_vline = false;
         visuals.striped = false;
         visuals.selection.bg_fill = self.accent.gamma_multiply(0.35);
