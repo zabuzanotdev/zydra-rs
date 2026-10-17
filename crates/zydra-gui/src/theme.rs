@@ -184,6 +184,15 @@ impl Theme {
         style.spacing.item_spacing = egui::vec2(self.gap(2.0), self.gap(1.5));
         style.spacing.button_padding = egui::vec2(self.gap(2.5), self.gap(1.5));
         style.spacing.window_margin = egui::Margin::same(8);
+        style.spacing.indent = self.gap(4.5);
+        style.spacing.scroll = egui::style::ScrollStyle {
+            floating: false,
+            bar_width: 10.0,
+            handle_min_length: 24.0,
+            bar_inner_margin: 2.0,
+            bar_outer_margin: 2.0,
+            ..Default::default()
+        };
         context.set_style(style);
     }
 }

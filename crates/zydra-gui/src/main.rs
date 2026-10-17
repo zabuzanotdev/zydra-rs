@@ -21,7 +21,8 @@ fn main() -> eframe::Result<()> {
             .with_app_id("dev.zydra.zydra")
             .with_title(title)
             .with_inner_size([DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT])
-            .with_min_inner_size([MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT]),
+            .with_min_inner_size([MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT])
+            .with_icon(zydra_gui::icon::app_icon()),
         vsync: true,
         centered: true,
         ..Default::default()

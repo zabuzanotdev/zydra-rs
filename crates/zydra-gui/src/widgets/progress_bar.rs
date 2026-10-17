@@ -1,6 +1,6 @@
 //! Bilah progres.
 
-use egui::Ui;
+use egui::{CornerRadius, Ui};
 
 use crate::theme::Theme;
 
@@ -8,18 +8,31 @@ use crate::theme::Theme;
 ///
 /// Nilai dijepit di sini juga, bukan hanya di mesin. Antarmuka tidak boleh menggambar
 /// bilah yang melewati batasnya sendiri hanya karena sebuah angka datang salah.
+///
+/// Digambar manual (jalur + isi) supaya memakai token tema (`bg_track` untuk jalur,
+/// `accent` untuk isi), bukan warna bawaan egui yang membuat bilahnya terlihat mentah.
 pub fn progress_bar(ui: &mut Ui, theme: &Theme, fraction: f32, height: f32) {
     let fraction = if fraction.is_nan() {
         0.0
     } else {
         fraction.clamp(0.0, 1.0)
     };
-    ui.add(
-        egui::ProgressBar::new(fraction)
-            .desired_height(height)
-            .fill(theme.accent)
-            .corner_radius(theme.control_radius()),
+    let width = ui.available_width();
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::hover());
+    let radius = CornerRadius::same((height / 2.0) as u8);
+    let painter = ui.painter_at(rect);
+    painter.rect_filled(rect, radius, theme.bg_track);
+    painter.rect_stroke(
+        rect,
+        radius,
+        theme.card_stroke(),
+        egui::StrokeKind::Inside,
     );
+    if fraction > 0.0 {
+        let fill_width = (rect.width() * fraction).max(height);
+        let fill_rect = egui::Rect::from_min_size(rect.min, egui::vec2(fill_width, height));
+        painter.rect_filled(fill_rect, radius, theme.accent);
+    }
 }
 
 /// Bilah jalur kosong, dipakai saat belum ada pekerjaan.

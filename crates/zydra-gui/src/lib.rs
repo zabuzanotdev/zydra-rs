@@ -9,6 +9,7 @@ pub mod app;
 pub mod constants;
 pub mod controller;
 pub mod fonts;
+pub mod icon;
 pub mod panels;
 pub mod responsive;
 pub mod state;
