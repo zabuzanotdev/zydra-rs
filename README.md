@@ -39,8 +39,8 @@ mendukung format yang belum bisa dipakai itu lebih buruk daripada tidak ada.
 | Antarmuka grafis (eframe/egui) | Berfungsi |
 | Dua bahasa (Inggris, Indonesia) | Berfungsi |
 | Resume serangan panjang | Berfungsi |
-| Ekspor log | Belum ada |
-| Rilis siap unduh | [v0.1.0](https://github.com/zabuzanotdev/zydra-rs/releases/tag/v0.1.0) |
+| Ekspor log | Berfungsi |
+| Rilis siap unduh | [rilis terbaru](https://github.com/zabuzanotdev/zydra-rs/releases/latest) |
 
 Pengujian: **414 tes otomatis**, dan `cargo clippy --all-targets -- -D warnings` bersih.
 
@@ -56,7 +56,8 @@ cd zydra-rs
 cargo build --release
 ```
 
-Binary-nya muncul di `target/release/zydra` (Windows: `zydra.exe`).
+Binary-nya muncul di `target/release/zydra` (CLI) dan `target/release/zydra-gui`
+(antarmuka grafis; Windows: `zydra.exe` dan `zydra-gui.exe`).
 
 Menjalankan tes:
 
@@ -317,8 +318,8 @@ worse than one that admits the gap.
 | Graphical interface (eframe/egui) | Works |
 | Two languages (English, Indonesian) | Works |
 | Resuming long attacks | Works |
-| Log export | Not started |
-| Downloadable releases | [v0.1.0](https://github.com/zabuzanotdev/zydra-rs/releases/tag/v0.1.0) |
+| Log export | Works |
+| Downloadable releases | [latest releases](https://github.com/zabuzanotdev/zydra-rs/releases/latest) |
 
 Testing: **414 automated tests**, with `cargo clippy --all-targets -- -D warnings` clean.
 
